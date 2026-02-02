@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>75 Day Challenge Tracker</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+        .checkbox-custom {
+            width: 28px;
+            height: 28px;
+            cursor: pointer;
+            border: 2px solid #D1D5DB;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        .checkbox-custom:hover {
+            border-color: #3B82F6;
+            transform: scale(1.05);
+        }
+        .checkbox-custom.checked {
+            background: #10B981;
+            border-color: #10B981;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .habit-row:hover {
+            background: #F9FAFB;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+        .loading {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const HABITS = [
+            { id: 'diet', name: 'Diet', icon: '🥗' },
+            { id: 'study', name: 'Study', icon: '📚' },
+            { id: 'work', name: 'Work 3-5h', icon: '💼' },
+            { id: 'read', name: 'Read', icon: '📖' },
+            { id: 'gym', name: 'Gym', icon: '💪' },
+            { id: 'spot', name: 'Spot', icon: '⭐' },
+            { id: 'phone', name: 'Phone <2.5h', icon: '📱' }
+        ];
+
+        function App() {
+            const [currentView, setCurrentView] = useState('dashboard');
+            const [challengeData, setChallengeData] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [startDate, setStartDate] = useState(null);
+
+            // Initialize or load data
+            useEffect(() => {
+                loadData();
+            }, []);
+
+            const loadData = () => {
+                try {
+                    const saved = localStorage.getItem('75-day-challenge-data');
+
+                    if (saved) {
+                        const data = JSON.parse(saved);
+                        setChallengeData(data.days);
+                        setStartDate(data.startDate);
+                    } else {
+                        // Initialize new challenge
+                        const newData = {};
+                        for (let i = 1; i <= 75; i++) {
+                            newData[i] = {
+                                diet: false,
+                                study: false,
+                                work: false,
+                                read: false,
+                                gym: false,
+                                spot: false,
+                                phone: false,
+                                notes: ''
+                            };
+                        }
+                        const today = new Date().toISOString().split('T')[0];
+                        saveData(newData, today);
+                        setChallengeData(newData);
+                        setStartDate(today);
+                    }
+                } catch (error) {
+                    console.error('Error loading data:', error);
+                    // Initialize fresh if corrupted
+                    const newData = {};
+                    for (let i = 1; i <= 75; i++) {
+                        newData[i] = {
+                            diet: false,
+                            study: false,
+                            work: false,
+                            read: false,
+                            gym: false,
+                            spot: false,
+                            phone: false,
+                            notes: ''
+                        };
+                    }
+                    const today = new Date().toISOString().split('T')[0];
+                    saveData(newData, today);
+                    setChallengeData(newData);
+                    setStartDate(today);
+                }
+                setLoading(false);
+            };
+
+            const saveData = (days, date) => {
+                try {
+                    localStorage.setItem('75-day-challenge-data', JSON.stringify({
+                        days: days,
+                        startDate: date
+                    }));
+                } catch (error) {
+                    console.error('Error saving:', error);
+                }
+            };
+
+            const toggleHabit = (day, habit) => {
+                const newData = {
+                    ...challengeData,
+                    [day]: {
+                        ...challengeData[day],
+                        [habit]: !challengeData[day][habit]
+                    }
+                };
+                setChallengeData(newData);
+                saveData(newData, startDate);
+            };
+
+            const updateNotes = (day, notes) => {
+                const newData = {
+                    ...challengeData,
+                    [day]: {
+                        ...challengeData[day],
+                        notes: notes
+                    }
+                };
+                setChallengeData(newData);
+                saveData(newData, startDate);
+            };
+
+            const resetChallenge = () => {
+                if (confirm('Are you sure you want to reset your challenge? This cannot be undone!')) {
+                    const newData = {};
+                    for (let i = 1; i <= 75; i++) {
+                        newData[i] = {
+                            diet: false,
+                            study: false,
+                            work: false,
+                            read: false,
+                            gym: false,
+                            spot: false,
+                            phone: false,
+                            notes: ''
+                        };
+                    }
+                    const today = new Date().toISOString().split('T')[0];
+                    setChallengeData(newData);
+                    setStartDate(today);
+                    saveData(newData, today);
+                }
+            };
+
+            if (loading) {
+                return (
+                    <div className="flex items-center justify-center h-screen">
+                        <div className="text-center">
+                            <div className="text-6xl mb-4 loading">🎯</div>
+                            <div className="text-xl text-gray-600">Loading your challenge...</div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen pb-20">
+                    {/* Header */}
+                    <div className="bg-gradient-to-r from-blue-900 to-purple-900 text-white shadow-lg">
+                        <div className="container mx-auto px-4 py-6">
+                            <h1 className="text-4xl font-bold text-center mb-2">🎯 75 Day Challenge</h1>
+                            <p className="text-center text-blue-200">Transform Your Life, One Day at a Time</p>
+                        </div>
+                    </div>
+
+                    {/* Navigation */}
+                    <div className="bg-white shadow-md sticky top-0 z-10">
+                        <div className="container mx-auto px-4">
+                            <div className="flex gap-4 py-3">
+                                <button
+                                    onClick={() => setCurrentView('dashboard')}
+                                    className={`px-6 py-2 rounded-lg font-semibold transition ${
+                                        currentView === 'dashboard'
+                                            ? 'bg-blue-600 text-white'
+                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    }`}
+                                >
+                                    📊 Dashboard
+                                </button>
+                                <button
+                                    onClick={() => setCurrentView('tracker')}
+                                    className={`px-6 py-2 rounded-lg font-semibold transition ${
+                                        currentView === 'tracker'
+                                            ? 'bg-blue-600 text-white'
+                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    }`}
+                                >
+                                    ✅ Daily Tracker
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Content */}
+                    <div className="container mx-auto px-4 py-8">
+                        {currentView === 'dashboard' ? (
+                            <Dashboard data={challengeData} startDate={startDate} onReset={resetChallenge} />
+                        ) : (
+                            <Tracker data={challengeData} onToggle={toggleHabit} onUpdateNotes={updateNotes} startDate={startDate} />
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        function Dashboard({ data, startDate, onReset }) {
+            const calculateStats = () => {
+                let perfectDays = 0;
+                let totalChecks = 0;
+                let currentStreak = 0;
+                let bestStreak = 0;
+                let tempStreak = 0;
+                
+                const habitStats = {};
+                HABITS.forEach(h => habitStats[h.id] = 0);
+
+                for (let day = 1; day <= 75; day++) {
+                    const dayData = data[day];
+                    let dayScore = 0;
+
+                    HABITS.forEach(habit => {
+                        if (dayData[habit.id]) {
+                            dayScore++;
+                            totalChecks++;
+                            habitStats[habit.id]++;
+                        }
+                    });
+
+                    if (dayScore === 7) {
+                        perfectDays++;
+                        tempStreak++;
+                        bestStreak = Math.max(bestStreak, tempStreak);
+                    } else {
+                        tempStreak = 0;
+                    }
+                }
+
+                // Current streak is the temp streak if still going
+                currentStreak = tempStreak;
+
+                return { perfectDays, totalChecks, currentStreak, bestStreak, habitStats };
+            };
+
+            const stats = calculateStats();
+            const progress = (stats.perfectDays / 75 * 100).toFixed(1);
+            const daysLeft = 75 - stats.perfectDays;
+
+            const getMilestoneStatus = (target) => {
+                return stats.perfectDays >= target;
+            };
+
+            return (
+                <div className="space-y-6">
+                    {/* Main Stats */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white">
+                            <div className="text-sm font-semibold opacity-90 mb-2">Perfect Days</div>
+                            <div className="text-5xl font-bold">{stats.perfectDays}</div>
+                            <div className="text-sm opacity-90 mt-1">/ 75</div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white">
+                            <div className="text-sm font-semibold opacity-90 mb-2">Progress</div>
+                            <div className="text-5xl font-bold">{progress}%</div>
+                            <div className="text-sm opacity-90 mt-1">Complete</div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl shadow-lg p-6 text-white">
+                            <div className="text-sm font-semibold opacity-90 mb-2">Days Left</div>
+                            <div className="text-5xl font-bold">{daysLeft}</div>
+                            <div className="text-sm opacity-90 mt-1">To go</div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white">
+                            <div className="text-sm font-semibold opacity-90 mb-2">Total Habits ✓</div>
+                            <div className="text-5xl font-bold">{stats.totalChecks}</div>
+                            <div className="text-sm opacity-90 mt-1">/ 525</div>
+                        </div>
+                    </div>
+
+                    {/* Streak */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-orange-200">
+                            <div className="flex items-center gap-3 mb-4">
+                                <span className="text-4xl">🔥</span>
+                                <div>
+                                    <h3 className="text-lg font-bold text-gray-800">Current Streak</h3>
+                                    <p className="text-sm text-gray-500">Consecutive perfect days</p>
+                                </div>
+                            </div>
+                            <div className="text-5xl font-bold text-orange-500">{stats.currentStreak}</div>
+                            <div className="text-gray-600 mt-1">days</div>
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-yellow-200">
+                            <div className="flex items-center gap-3 mb-4">
+                                <span className="text-4xl">🏆</span>
+                                <div>
+                                    <h3 className="text-lg font-bold text-gray-800">Best Streak</h3>
+                                    <p className="text-sm text-gray-500">Your longest run</p>
+                                </div>
+                            </div>
+                            <div className="text-5xl font-bold text-yellow-600">{stats.bestStreak}</div>
+                            <div className="text-gray-600 mt-1">days</div>
+                        </div>
+                    </div>
+
+                    {/* Habit Breakdown */}
+                    <div className="bg-white rounded-xl shadow-lg p-6">
+                        <h3 className="text-xl font-bold text-gray-800 mb-4">📊 Habit Success Rate</h3>
+                        <div className="space-y-3">
+                            {HABITS.map(habit => {
+                                const count = stats.habitStats[habit.id];
+                                const rate = (count / 75 * 100).toFixed(1);
+                                const emoji = rate >= 90 ? '🔥' : rate >= 70 ? '💪' : rate >= 50 ? '👍' : '⚠️';
+                                
+                                return (
+                                    <div key={habit.id} className="flex items-center gap-4">
+                                        <span className="text-2xl">{habit.icon}</span>
+                                        <div className="flex-1">
+                                            <div className="flex justify-between mb-1">
+                                                <span className="font-semibold text-gray-700">{habit.name}</span>
+                                                <span className="text-sm text-gray-500">{count}/75 ({rate}%)</span>
+                                            </div>
+                                            <div className="w-full bg-gray-200 rounded-full h-3">
+                                                <div 
+                                                    className="bg-gradient-to-r from-blue-500 to-purple-500 h-3 rounded-full transition-all"
+                                                    style={{ width: `${rate}%` }}
+                                                ></div>
+                                            </div>
+                                        </div>
+                                        <span className="text-2xl">{emoji}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Milestones */}
+                    <div className="bg-white rounded-xl shadow-lg p-6">
+                        <h3 className="text-xl font-bold text-gray-800 mb-4">🎯 Milestones</h3>
+                        <div className="space-y-3">
+                            {[
+                                { day: 25, label: 'Day 25', desc: '1st Quarter Done!' },
+                                { day: 38, label: 'Day 38', desc: 'Halfway Point' },
+                                { day: 50, label: 'Day 50', desc: '2/3 Complete' },
+                                { day: 63, label: 'Day 63', desc: 'Final Stretch' },
+                                { day: 75, label: 'Day 75', desc: 'CHAMPION! 🏆' }
+                            ].map(milestone => (
+                                <div key={milestone.day} className="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50">
+                                    <span className="text-3xl">{getMilestoneStatus(milestone.day) ? '✅' : '⏳'}</span>
+                                    <div className="flex-1">
+                                        <div className="font-semibold text-gray-800">{milestone.label}</div>
+                                        <div className="text-sm text-gray-500">{milestone.desc}</div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Motivation */}
+                    <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl shadow-lg p-8 text-white text-center">
+                        <div className="text-4xl mb-4">💪</div>
+                        <h3 className="text-2xl font-bold mb-3">Keep Going!</h3>
+                        <p className="text-lg mb-2 italic">"Discipline is choosing between what you want now</p>
+                        <p className="text-lg italic">and what you want most."</p>
+                        <p className="mt-4 text-blue-100">Every checkbox is a vote for the person you are becoming. 🚀</p>
+                    </div>
+
+                    {/* Reset Button */}
+                    <div className="text-center">
+                        <button
+                            onClick={onReset}
+                            className="px-6 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition font-semibold"
+                        >
+                            🔄 Reset Challenge
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        function Tracker({ data, onToggle, onUpdateNotes, startDate }) {
+            const [selectedDay, setSelectedDay] = useState(1);
+            const [notes, setNotes] = useState('');
+
+            useEffect(() => {
+                setNotes(data[selectedDay].notes || '');
+            }, [selectedDay, data]);
+
+            const handleNotesChange = (e) => {
+                setNotes(e.target.value);
+                onUpdateNotes(selectedDay, e.target.value);
+            };
+
+            const dayData = data[selectedDay];
+            const score = HABITS.reduce((sum, habit) => sum + (dayData[habit.id] ? 1 : 0), 0);
+            const isPerfect = score === 7;
+
+            const getDateForDay = (day) => {
+                const start = new Date(startDate);
+                start.setDate(start.getDate() + day - 1);
+                return start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            };
+
+            return (
+                <div className="space-y-6">
+                    {/* Day Selector */}
+                    <div className="bg-white rounded-xl shadow-lg p-6">
+                        <h3 className="text-lg font-bold text-gray-800 mb-4">Select Day</h3>
+                        <div className="grid grid-cols-5 sm:grid-cols-10 md:grid-cols-15 gap-2">
+                            {Array.from({ length: 75 }, (_, i) => i + 1).map(day => {
+                                const dayScore = HABITS.reduce((sum, habit) => sum + (data[day][habit.id] ? 1 : 0), 0);
+                                const isPerfectDay = dayScore === 7;
+                                
+                                return (
+                                    <button
+                                        key={day}
+                                        onClick={() => setSelectedDay(day)}
+                                        className={`py-2 px-3 rounded-lg font-semibold transition ${
+                                            selectedDay === day
+                                                ? 'bg-blue-600 text-white scale-110'
+                                                : isPerfectDay
+                                                ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                                : dayScore > 0
+                                                ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        }`}
+                                    >
+                                        {day}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Selected Day Details */}
+                    <div className="bg-white rounded-xl shadow-lg p-6">
+                        <div className="flex items-center justify-between mb-6">
+                            <div>
+                                <h2 className="text-3xl font-bold text-gray-800">Day {selectedDay}</h2>
+                                <p className="text-gray-500">{getDateForDay(selectedDay)}</p>
+                            </div>
+                            <div className="text-right">
+                                <div className="text-4xl mb-1">{isPerfect ? '🔥' : '⏳'}</div>
+                                <div className="text-2xl font-bold text-blue-600">{score}/7</div>
+                            </div>
+                        </div>
+
+                        {/* Habits */}
+                        <div className="space-y-3 mb-6">
+                            {HABITS.map(habit => (
+                                <div key={habit.id} className="habit-row flex items-center gap-4 p-4 rounded-lg border-2 border-gray-100 transition">
+                                    <span className="text-3xl">{habit.icon}</span>
+                                    <span className="flex-1 font-semibold text-gray-700 text-lg">{habit.name}</span>
+                                    <div
+                                        className={`checkbox-custom ${dayData[habit.id] ? 'checked' : ''}`}
+                                        onClick={() => onToggle(selectedDay, habit.id)}
+                                    >
+                                        {dayData[habit.id] && (
+                                            <div className="text-white text-center text-xl font-bold leading-6">✓</div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Notes */}
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                📝 Notes & Reflections
+                            </label>
+                            <textarea
+                                value={notes}
+                                onChange={handleNotesChange}
+                                placeholder="How did today go? What did you learn?"
+                                className="w-full p-4 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none resize-none"
+                                rows="4"
+                            />
+                        </div>
+
+                        {/* Perfect Day Message */}
+                        {isPerfect && (
+                            <div className="mt-6 bg-gradient-to-r from-green-100 to-emerald-100 border-2 border-green-300 rounded-lg p-4 text-center">
+                                <div className="text-3xl mb-2">🎉</div>
+                                <div className="text-lg font-bold text-green-800">Perfect Day!</div>
+                                <div className="text-sm text-green-600">You crushed all 7 habits today!</div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Navigation */}
+                    <div className="flex gap-4">
+                        <button
+                            onClick={() => setSelectedDay(Math.max(1, selectedDay - 1))}
+                            disabled={selectedDay === 1}
+                            className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                        >
+                            ← Previous Day
+                        </button>
+                        <button
+                            onClick={() => setSelectedDay(Math.min(75, selectedDay + 1))}
+                            disabled={selectedDay === 75}
+                            className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                        >
+                            Next Day →
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
