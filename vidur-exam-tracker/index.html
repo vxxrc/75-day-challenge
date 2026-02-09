@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vidur's Exam Tracker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        header h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .streak-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255,255,255,0.2);
+            padding: 10px 20px;
+            border-radius: 50px;
+            font-size: 1.2rem;
+        }
+
+        .streak-badge .fire {
+            font-size: 1.5rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .stat-card .number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-card .label {
+            color: #666;
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .date-nav {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .date-nav button {
+            background: #667eea;
+            color: white;
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: transform 0.2s;
+        }
+
+        .date-nav button:hover {
+            transform: scale(1.1);
+        }
+
+        .date-nav span {
+            font-size: 1.1rem;
+            min-width: 140px;
+            text-align: center;
+        }
+
+        .task-list {
+            list-style: none;
+        }
+
+        .task-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            background: #f8f9fa;
+            transition: all 0.3s;
+        }
+
+        .task-item:hover {
+            background: #e9ecef;
+        }
+
+        .task-item.completed {
+            background: #d4edda;
+        }
+
+        .task-item input[type="checkbox"] {
+            width: 22px;
+            height: 22px;
+            margin-right: 15px;
+            cursor: pointer;
+            accent-color: #667eea;
+        }
+
+        .task-item label {
+            flex: 1;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .task-item.completed label {
+            text-decoration: line-through;
+            color: #666;
+        }
+
+        .subject-tag {
+            background: #667eea;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            margin-right: 10px;
+        }
+
+        .no-tasks {
+            text-align: center;
+            color: #666;
+            padding: 40px;
+        }
+
+        .edit-btn {
+            background: none;
+            border: 1px solid #667eea;
+            color: #667eea;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .edit-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .edit-section {
+            display: none;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+
+        .edit-section.active {
+            display: block;
+        }
+
+        .edit-section textarea {
+            width: 100%;
+            height: 150px;
+            padding: 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 0.95rem;
+            resize: vertical;
+        }
+
+        .edit-section textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .edit-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn-save {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .btn-cancel {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            margin-top: 15px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        .calendar-day {
+            aspect-ratio: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            background: #f8f9fa;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .calendar-day:hover {
+            transform: scale(1.05);
+        }
+
+        .calendar-day.today {
+            border: 2px solid #667eea;
+        }
+
+        .calendar-day.completed {
+            background: #d4edda;
+        }
+
+        .calendar-day.partial {
+            background: #fff3cd;
+        }
+
+        .calendar-day .day-num {
+            font-weight: bold;
+        }
+
+        .calendar-day .month {
+            font-size: 0.7rem;
+            color: #666;
+        }
+
+        .add-task-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+
+        .add-task-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .add-task-row input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        .add-task-row input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .add-task-row button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .delete-btn {
+            background: none;
+            border: none;
+            color: #dc3545;
+            cursor: pointer;
+            padding: 5px;
+            opacity: 0.5;
+            transition: opacity 0.2s;
+        }
+
+        .delete-btn:hover {
+            opacity: 1;
+        }
+
+        @media (max-width: 600px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            .calendar-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Vidur's Exam Tracker</h1>
+            <div class="streak-badge">
+                <span class="fire">🔥</span>
+                <span id="streakCount">0</span> Day Streak
+            </div>
+        </header>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="number" id="totalCompleted">0</div>
+                <div class="label">Tasks Completed</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="totalTasks">0</div>
+                <div class="label">Total Tasks</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="daysLeft">0</div>
+                <div class="label">Days to Exams</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>
+                <span>Today's Tasks</span>
+                <div class="date-nav">
+                    <button onclick="changeDate(-1)">‹</button>
+                    <span id="currentDate"></span>
+                    <button onclick="changeDate(1)">›</button>
+                </div>
+            </h2>
+
+            <ul class="task-list" id="taskList">
+                <!-- Tasks will be rendered here -->
+            </ul>
+
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+            </div>
+
+            <div class="add-task-section">
+                <div class="add-task-row">
+                    <input type="text" id="newTaskInput" placeholder="Add a new task for this day...">
+                    <button onclick="addNewTask()">Add</button>
+                </div>
+            </div>
+
+            <div class="edit-section" id="editSection">
+                <h3 style="margin-bottom: 10px;">Edit Today's Tasks</h3>
+                <p style="color: #666; font-size: 0.9rem; margin-bottom: 10px;">One task per line:</p>
+                <textarea id="editTextarea"></textarea>
+                <div class="edit-actions">
+                    <button class="btn-save" onclick="saveTasks()">Save Changes</button>
+                    <button class="btn-cancel" onclick="toggleEdit()">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Progress Calendar</h2>
+            <div class="calendar-grid" id="calendarGrid">
+                <!-- Calendar will be rendered here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initial timetable data
+        const defaultTimetable = {
+            "2026-02-10": ["Chemistry - chapters 1 to 4", "Maths - Rational, Irrational numbers or Maths paper"],
+            "2026-02-11": ["Maths - Compound Interest"],
+            "2026-02-12": ["English - Literature paper for test"],
+            "2026-02-13": ["Expansion", "Physics full paper"],
+            "2026-02-14": ["Physics", "Maths test paper", "Geography - National regions"],
+            "2026-02-15": ["Hindi - 2 chapters and 2 poems", "Biology - Digestive system"],
+            "2026-02-16": ["Maths paper", "Computer Applications - Chapter 3 and 4"],
+            "2026-02-17": ["Civics - Elections", "Chemistry prep for test"],
+            "2026-02-18": ["Chemistry", "Maths paper"],
+            "2026-02-19": ["Bio - Chapter 12 Skeleton", "Bio - Chapter 13 Skin", "Civics - Chapter 1,2,3", "Maths - Factorisation"],
+            "2026-02-20": ["Physics", "Geography - Maps 2,3,4"],
+            "2026-02-21": ["Physics", "Biology - Chapter 15,16,17"],
+            "2026-02-22": ["Computer Applications - 3 chapters", "Geography - Chapter 10,11,12,13,14"],
+            "2026-02-23": ["Hindi"],
+            "2026-02-24": ["Hindi", "Chemistry"],
+            "2026-02-25": ["Hindi", "Chemistry"],
+            "2026-02-26": ["Maths"],
+            "2026-02-27": ["Geography - Chapter 1,2,3,4,5", "Geography - Maps"]
+        };
+
+        // State
+        let currentDate = new Date();
+        let timetable = {};
+        let completedTasks = {};
+        let streakData = { current: 0, lastCompletedDate: null };
+
+        // Initialize
+        function init() {
+            loadData();
+            setToToday();
+            renderAll();
+        }
+
+        function loadData() {
+            const savedTimetable = localStorage.getItem('vidur_timetable');
+            const savedCompleted = localStorage.getItem('vidur_completed');
+            const savedStreak = localStorage.getItem('vidur_streak');
+
+            timetable = savedTimetable ? JSON.parse(savedTimetable) : { ...defaultTimetable };
+            completedTasks = savedCompleted ? JSON.parse(savedCompleted) : {};
+            streakData = savedStreak ? JSON.parse(savedStreak) : { current: 0, lastCompletedDate: null };
+        }
+
+        function saveData() {
+            localStorage.setItem('vidur_timetable', JSON.stringify(timetable));
+            localStorage.setItem('vidur_completed', JSON.stringify(completedTasks));
+            localStorage.setItem('vidur_streak', JSON.stringify(streakData));
+        }
+
+        function formatDate(date) {
+            return date.toISOString().split('T')[0];
+        }
+
+        function formatDisplayDate(date) {
+            const options = { weekday: 'short', month: 'short', day: 'numeric' };
+            return date.toLocaleDateString('en-US', options);
+        }
+
+        function setToToday() {
+            currentDate = new Date();
+            currentDate.setHours(0, 0, 0, 0);
+        }
+
+        function changeDate(delta) {
+            currentDate.setDate(currentDate.getDate() + delta);
+            renderAll();
+        }
+
+        function getTasksForDate(dateStr) {
+            return timetable[dateStr] || [];
+        }
+
+        function getCompletedForDate(dateStr) {
+            return completedTasks[dateStr] || [];
+        }
+
+        function renderTasks() {
+            const dateStr = formatDate(currentDate);
+            const tasks = getTasksForDate(dateStr);
+            const completed = getCompletedForDate(dateStr);
+            const taskList = document.getElementById('taskList');
+
+            document.getElementById('currentDate').textContent = formatDisplayDate(currentDate);
+
+            if (tasks.length === 0) {
+                taskList.innerHTML = '<li class="no-tasks">No tasks scheduled for this day. Add some!</li>';
+                document.getElementById('progressFill').style.width = '0%';
+                return;
+            }
+
+            taskList.innerHTML = tasks.map((task, index) => {
+                const isCompleted = completed.includes(task);
+                const subject = task.split(' - ')[0] || task.split(' ')[0];
+                return `
+                    <li class="task-item ${isCompleted ? 'completed' : ''}">
+                        <input type="checkbox" id="task${index}"
+                            ${isCompleted ? 'checked' : ''}
+                            onchange="toggleTask('${dateStr}', '${task.replace(/'/g, "\\'")}')">
+                        <label for="task${index}">
+                            <span class="subject-tag">${subject}</span>
+                            ${task}
+                        </label>
+                        <button class="delete-btn" onclick="deleteTask('${dateStr}', ${index})">✕</button>
+                    </li>
+                `;
+            }).join('');
+
+            const progress = tasks.length > 0 ? (completed.length / tasks.length) * 100 : 0;
+            document.getElementById('progressFill').style.width = `${progress}%`;
+        }
+
+        function toggleTask(dateStr, task) {
+            if (!completedTasks[dateStr]) {
+                completedTasks[dateStr] = [];
+            }
+
+            const index = completedTasks[dateStr].indexOf(task);
+            if (index > -1) {
+                completedTasks[dateStr].splice(index, 1);
+            } else {
+                completedTasks[dateStr].push(task);
+            }
+
+            updateStreak();
+            saveData();
+            renderAll();
+        }
+
+        function deleteTask(dateStr, taskIndex) {
+            if (timetable[dateStr]) {
+                timetable[dateStr].splice(taskIndex, 1);
+                if (timetable[dateStr].length === 0) {
+                    delete timetable[dateStr];
+                }
+                saveData();
+                renderAll();
+            }
+        }
+
+        function addNewTask() {
+            const input = document.getElementById('newTaskInput');
+            const task = input.value.trim();
+            if (!task) return;
+
+            const dateStr = formatDate(currentDate);
+            if (!timetable[dateStr]) {
+                timetable[dateStr] = [];
+            }
+            timetable[dateStr].push(task);
+            input.value = '';
+            saveData();
+            renderAll();
+        }
+
+        function toggleEdit() {
+            const editSection = document.getElementById('editSection');
+            const isActive = editSection.classList.contains('active');
+
+            if (!isActive) {
+                const dateStr = formatDate(currentDate);
+                const tasks = getTasksForDate(dateStr);
+                document.getElementById('editTextarea').value = tasks.join('\n');
+            }
+
+            editSection.classList.toggle('active');
+        }
+
+        function saveTasks() {
+            const dateStr = formatDate(currentDate);
+            const textarea = document.getElementById('editTextarea');
+            const tasks = textarea.value.split('\n').filter(t => t.trim());
+
+            if (tasks.length > 0) {
+                timetable[dateStr] = tasks;
+            } else {
+                delete timetable[dateStr];
+            }
+
+            saveData();
+            toggleEdit();
+            renderAll();
+        }
+
+        function updateStreak() {
+            const today = formatDate(new Date());
+            const todayTasks = getTasksForDate(today);
+            const todayCompleted = getCompletedForDate(today);
+
+            // Check if all tasks for today are completed
+            const allDone = todayTasks.length > 0 && todayCompleted.length === todayTasks.length;
+
+            if (allDone) {
+                if (streakData.lastCompletedDate === today) {
+                    // Already counted today
+                    return;
+                }
+
+                const yesterday = new Date();
+                yesterday.setDate(yesterday.getDate() - 1);
+                const yesterdayStr = formatDate(yesterday);
+
+                if (streakData.lastCompletedDate === yesterdayStr || streakData.current === 0) {
+                    streakData.current++;
+                } else {
+                    streakData.current = 1;
+                }
+                streakData.lastCompletedDate = today;
+            }
+        }
+
+        function renderStats() {
+            let totalCompleted = 0;
+            let totalTasks = 0;
+
+            Object.keys(timetable).forEach(dateStr => {
+                const tasks = timetable[dateStr];
+                const completed = completedTasks[dateStr] || [];
+                totalTasks += tasks.length;
+                totalCompleted += completed.filter(t => tasks.includes(t)).length;
+            });
+
+            document.getElementById('totalCompleted').textContent = totalCompleted;
+            document.getElementById('totalTasks').textContent = totalTasks;
+            document.getElementById('streakCount').textContent = streakData.current;
+
+            // Days until Feb 29
+            const examDate = new Date('2026-02-29');
+            const today = new Date();
+            const diffTime = examDate - today;
+            const diffDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+            document.getElementById('daysLeft').textContent = diffDays;
+        }
+
+        function renderCalendar() {
+            const calendarGrid = document.getElementById('calendarGrid');
+            const startDate = new Date('2026-02-10');
+            const endDate = new Date('2026-02-29');
+            const today = formatDate(new Date());
+
+            let html = '';
+            let currentDay = new Date(startDate);
+
+            while (currentDay <= endDate) {
+                const dateStr = formatDate(currentDay);
+                const tasks = getTasksForDate(dateStr);
+                const completed = getCompletedForDate(dateStr);
+
+                let statusClass = '';
+                if (tasks.length > 0) {
+                    if (completed.length === tasks.length) {
+                        statusClass = 'completed';
+                    } else if (completed.length > 0) {
+                        statusClass = 'partial';
+                    }
+                }
+
+                if (dateStr === today) {
+                    statusClass += ' today';
+                }
+
+                html += `
+                    <div class="calendar-day ${statusClass}" onclick="goToDate('${dateStr}')">
+                        <span class="day-num">${currentDay.getDate()}</span>
+                        <span class="month">Feb</span>
+                    </div>
+                `;
+
+                currentDay.setDate(currentDay.getDate() + 1);
+            }
+
+            calendarGrid.innerHTML = html;
+        }
+
+        function goToDate(dateStr) {
+            currentDate = new Date(dateStr + 'T00:00:00');
+            renderAll();
+        }
+
+        function renderAll() {
+            renderTasks();
+            renderStats();
+            renderCalendar();
+        }
+
+        // Handle Enter key for adding tasks
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('newTaskInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    addNewTask();
+                }
+            });
+            init();
+        });
+    </script>
+</body>
+</html>
