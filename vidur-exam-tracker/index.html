@@ -306,6 +306,16 @@
             background: #fff3cd;
         }
 
+        .calendar-day.exam-day {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            cursor: default;
+        }
+
+        .calendar-day.exam-day .month {
+            color: rgba(255,255,255,0.9);
+        }
+
         .calendar-day .day-num {
             font-weight: bold;
         }
@@ -734,8 +744,8 @@
             document.getElementById('totalTasks').textContent = totalTasks;
             document.getElementById('streakCount').textContent = streakData.current;
 
-            // Days until Feb 29
-            const examDate = new Date('2026-02-29T00:00:00');
+            // Days until exams (March 1, since Feb 29 doesn't exist in 2026)
+            const examDate = new Date('2026-03-01T00:00:00');
             const today = new Date();
             const diffTime = examDate - today;
             const diffDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
@@ -745,7 +755,7 @@
         function renderCalendar() {
             const calendarGrid = document.getElementById('calendarGrid');
             const startDate = new Date('2026-02-10T00:00:00');
-            const endDate = new Date('2026-02-29T00:00:00');
+            const endDate = new Date('2026-02-28T00:00:00');
             const today = formatDate(new Date());
 
             let html = '';
@@ -779,6 +789,14 @@
 
                 currentDay.setDate(currentDay.getDate() + 1);
             }
+
+            // Add "Exams Start" box
+            html += `
+                <div class="calendar-day exam-day">
+                    <span class="day-num" style="font-size: 0.7rem;">EXAMS</span>
+                    <span class="month">You got this!</span>
+                </div>
+            `;
 
             calendarGrid.innerHTML = html;
         }
