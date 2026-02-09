@@ -48,6 +48,20 @@
             font-size: 1.5rem;
         }
 
+        .sync-status {
+            font-size: 0.8rem;
+            margin-top: 10px;
+            opacity: 0.8;
+        }
+
+        .sync-status.connected {
+            color: #90EE90;
+        }
+
+        .sync-status.disconnected {
+            color: #FFB6C1;
+        }
+
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -349,6 +363,12 @@
             opacity: 1;
         }
 
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
         @media (max-width: 600px) {
             .stats-grid {
                 grid-template-columns: 1fr;
@@ -362,14 +382,15 @@
 <body>
     <div class="container">
         <header>
-            <p style="font-size: 1rem; opacity: 0.9; margin-bottom: 15px; max-width: 500px; margin-left: auto; margin-right: auto; line-height: 1.5;">
-                Results will come and go, but giving your best every single day? That's the real victory. This tracker celebrates your effort — because showing up and putting in 100% is an achievement in itself.
+            <p style="font-size: 0.85rem; opacity: 0.85; margin-bottom: 12px; max-width: 450px; margin-left: auto; margin-right: auto; line-height: 1.4;">
+                Your effort is the real victory — show up, give 100%, and let the results follow.
             </p>
             <h1>Vidur's Exam Tracker</h1>
             <div class="streak-badge">
                 <span class="fire">🔥</span>
                 <span id="streakCount">0</span> Day Streak
             </div>
+            <div class="sync-status" id="syncStatus">Connecting...</div>
         </header>
 
         <div class="stats-grid">
@@ -398,7 +419,7 @@
             </h2>
 
             <ul class="task-list" id="taskList">
-                <!-- Tasks will be rendered here -->
+                <li class="loading">Loading tasks...</li>
             </ul>
 
             <div class="progress-bar">
@@ -431,7 +452,26 @@
         </div>
     </div>
 
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
     <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCw9oyLuBgOAZIwW3-qNzOd82bmc3B7AfM",
+            authDomain: "vidur-exam-tracker.firebaseapp.com",
+            databaseURL: "https://vidur-exam-tracker-default-rtdb.firebaseio.com",
+            projectId: "vidur-exam-tracker",
+            storageBucket: "vidur-exam-tracker.firebasestorage.app",
+            messagingSenderId: "117482691075",
+            appId: "1:117482691075:web:3ff90cdf7c79a0fc908c36"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
         // Initial timetable data
         const defaultTimetable = {
             "2026-02-10": ["Chemistry - chapters 1 to 4", "Maths - Rational, Irrational numbers or Maths paper"],
@@ -459,28 +499,63 @@
         let timetable = {};
         let completedTasks = {};
         let streakData = { current: 0, lastCompletedDate: null };
+        let isConnected = false;
 
         // Initialize
         function init() {
-            loadData();
             setToToday();
-            renderAll();
+            setupFirebaseListeners();
+            setupConnectionListener();
         }
 
-        function loadData() {
-            const savedTimetable = localStorage.getItem('vidur_timetable');
-            const savedCompleted = localStorage.getItem('vidur_completed');
-            const savedStreak = localStorage.getItem('vidur_streak');
+        function setupConnectionListener() {
+            const connectedRef = database.ref(".info/connected");
+            connectedRef.on("value", (snap) => {
+                isConnected = snap.val() === true;
+                const statusEl = document.getElementById('syncStatus');
+                if (isConnected) {
+                    statusEl.textContent = "Synced across all devices";
+                    statusEl.className = "sync-status connected";
+                } else {
+                    statusEl.textContent = "Offline - changes will sync when connected";
+                    statusEl.className = "sync-status disconnected";
+                }
+            });
+        }
 
-            timetable = savedTimetable ? JSON.parse(savedTimetable) : { ...defaultTimetable };
-            completedTasks = savedCompleted ? JSON.parse(savedCompleted) : {};
-            streakData = savedStreak ? JSON.parse(savedStreak) : { current: 0, lastCompletedDate: null };
+        function setupFirebaseListeners() {
+            // Listen for timetable changes
+            database.ref('timetable').on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    timetable = data;
+                } else {
+                    // Initialize with default timetable
+                    timetable = { ...defaultTimetable };
+                    database.ref('timetable').set(timetable);
+                }
+                renderAll();
+            });
+
+            // Listen for completed tasks changes
+            database.ref('completedTasks').on('value', (snapshot) => {
+                const data = snapshot.val();
+                completedTasks = data || {};
+                renderAll();
+            });
+
+            // Listen for streak changes
+            database.ref('streak').on('value', (snapshot) => {
+                const data = snapshot.val();
+                streakData = data || { current: 0, lastCompletedDate: null };
+                renderAll();
+            });
         }
 
         function saveData() {
-            localStorage.setItem('vidur_timetable', JSON.stringify(timetable));
-            localStorage.setItem('vidur_completed', JSON.stringify(completedTasks));
-            localStorage.setItem('vidur_streak', JSON.stringify(streakData));
+            database.ref('timetable').set(timetable);
+            database.ref('completedTasks').set(completedTasks);
+            database.ref('streak').set(streakData);
         }
 
         function formatDate(date) {
@@ -558,8 +633,8 @@
             }
 
             updateStreak();
-            saveData();
-            renderAll();
+            database.ref('completedTasks').set(completedTasks);
+            database.ref('streak').set(streakData);
         }
 
         function deleteTask(dateStr, taskIndex) {
@@ -568,8 +643,7 @@
                 if (timetable[dateStr].length === 0) {
                     delete timetable[dateStr];
                 }
-                saveData();
-                renderAll();
+                database.ref('timetable').set(timetable);
             }
         }
 
@@ -584,8 +658,7 @@
             }
             timetable[dateStr].push(task);
             input.value = '';
-            saveData();
-            renderAll();
+            database.ref('timetable').set(timetable);
         }
 
         function toggleEdit() {
@@ -612,9 +685,8 @@
                 delete timetable[dateStr];
             }
 
-            saveData();
+            database.ref('timetable').set(timetable);
             toggleEdit();
-            renderAll();
         }
 
         function updateStreak() {
