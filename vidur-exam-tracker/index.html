@@ -769,10 +769,11 @@
                     statusClass += ' today';
                 }
 
+                const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                 html += `
                     <div class="calendar-day ${statusClass}" onclick="goToDate('${dateStr}')">
                         <span class="day-num">${currentDay.getDate()}</span>
-                        <span class="month">Feb</span>
+                        <span class="month">${monthNames[currentDay.getMonth()]}</span>
                     </div>
                 `;
 
