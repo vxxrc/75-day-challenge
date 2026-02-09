@@ -351,6 +351,30 @@
             color: #fff;
         }
 
+        .reward-banner {
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+            border-radius: 10px;
+            padding: 12px 15px;
+            margin-bottom: 15px;
+            text-align: center;
+            font-size: 0.95rem;
+            color: #8b4513;
+        }
+
+        .reward-banner.earned {
+            background: linear-gradient(135deg, #a8e063 0%, #56ab2f 100%);
+            color: white;
+        }
+
+        .reward-banner .reward-icon {
+            font-size: 1.2rem;
+            margin-right: 8px;
+        }
+
+        .reward-banner .reward-name {
+            font-weight: bold;
+        }
+
         .calendar-day .day-num {
             font-weight: bold;
         }
@@ -633,6 +657,14 @@
             return completedTasks[dateStr] || [];
         }
 
+        function getDayNumber(dateStr) {
+            const startDate = new Date('2026-02-10T00:00:00');
+            const checkDate = new Date(dateStr + 'T00:00:00');
+            const diffTime = checkDate - startDate;
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            return diffDays + 1; // 1-indexed
+        }
+
         function renderTasks() {
             const dateStr = formatDate(currentDate);
             const tasks = getTasksForDate(dateStr);
@@ -641,13 +673,40 @@
 
             document.getElementById('currentDate').textContent = formatDisplayDate(currentDate);
 
+            // Milestone rewards
+            const milestoneRewards = {
+                4: { name: "Butter Chicken", icon: "🍗" },
+                8: { name: "Croffle Guys", icon: "🧇" },
+                12: { name: "Mississippi Mud", icon: "🍫" },
+                19: { name: "Whatever Vidur wants!", icon: "🎉" }
+            };
+
+            // Check if this is a milestone day and add reward banner
+            const dayNumber = getDayNumber(dateStr);
+            let rewardBanner = '';
+            if (milestoneRewards[dayNumber]) {
+                const reward = milestoneRewards[dayNumber];
+                const isAllDone = tasks.length > 0 && completed.length === tasks.length;
+                if (isAllDone) {
+                    rewardBanner = `<div class="reward-banner earned">
+                        <span class="reward-icon">${reward.icon}</span>
+                        <span class="reward-name">Reward Earned: Mama to get ${reward.name}!</span>
+                    </div>`;
+                } else {
+                    rewardBanner = `<div class="reward-banner">
+                        <span class="reward-icon">${reward.icon}</span>
+                        Complete all tasks → <span class="reward-name">Mama will get ${reward.name}!</span>
+                    </div>`;
+                }
+            }
+
             if (tasks.length === 0) {
-                taskList.innerHTML = '<li class="no-tasks">No tasks scheduled for this day. Add some!</li>';
+                taskList.innerHTML = rewardBanner + '<li class="no-tasks">No tasks scheduled for this day. Add some!</li>';
                 document.getElementById('progressFill').style.width = '0%';
                 return;
             }
 
-            taskList.innerHTML = tasks.map((task, index) => {
+            taskList.innerHTML = rewardBanner + tasks.map((task, index) => {
                 const isCompleted = completed.includes(task);
                 const subject = task.split(' - ')[0] || task.split(' ')[0];
                 return `
