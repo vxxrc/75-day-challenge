@@ -650,7 +650,19 @@
             database.ref('streak').set(streakData);
         }
 
+        function confirmWithMama(action) {
+            const confirmed = confirm("Has Mama confirmed this change?");
+            if (confirmed) {
+                return true;
+            } else {
+                alert("Please confirm this change with Mama first!");
+                return false;
+            }
+        }
+
         function deleteTask(dateStr, taskIndex) {
+            if (!confirmWithMama('delete')) return;
+
             if (timetable[dateStr]) {
                 timetable[dateStr].splice(taskIndex, 1);
                 if (timetable[dateStr].length === 0) {
@@ -664,6 +676,8 @@
             const input = document.getElementById('newTaskInput');
             const task = input.value.trim();
             if (!task) return;
+
+            if (!confirmWithMama('add')) return;
 
             const dateStr = formatDate(currentDate);
             if (!timetable[dateStr]) {
@@ -688,6 +702,8 @@
         }
 
         function saveTasks() {
+            if (!confirmWithMama('edit')) return;
+
             const dateStr = formatDate(currentDate);
             const textarea = document.getElementById('editTextarea');
             const tasks = textarea.value.split('\n').filter(t => t.trim());
