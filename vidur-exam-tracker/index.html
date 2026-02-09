@@ -316,6 +316,41 @@
             color: rgba(255,255,255,0.9);
         }
 
+        .calendar-day.milestone {
+            position: relative;
+        }
+
+        .reward-text {
+            position: absolute;
+            bottom: 2px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.45rem;
+            color: #999;
+            white-space: nowrap;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .reward-text.earned {
+            color: #28a745;
+            font-weight: bold;
+        }
+
+        .calendar-day.milestone.completed {
+            background: linear-gradient(135deg, #28a745, #20c997);
+        }
+
+        .calendar-day.milestone.completed .day-num,
+        .calendar-day.milestone.completed .month {
+            color: white;
+        }
+
+        .calendar-day.milestone.completed .reward-text {
+            color: #fff;
+        }
+
         .calendar-day .day-num {
             font-weight: bold;
         }
@@ -774,8 +809,17 @@
             const endDate = new Date('2026-02-28T00:00:00');
             const today = formatDate(new Date());
 
+            // Milestone rewards (day number -> reward)
+            const milestoneRewards = {
+                4: "Butter Chicken!",
+                8: "Croffle Guys!",
+                12: "Mississippi Mud!",
+                19: "Vidur's choice!"
+            };
+
             let html = '';
             let currentDay = new Date(startDate);
+            let dayNumber = 1;
 
             while (currentDay <= endDate) {
                 const dateStr = formatDate(currentDay);
@@ -783,9 +827,11 @@
                 const completed = getCompletedForDate(dateStr);
 
                 let statusClass = '';
+                let isCompleted = false;
                 if (tasks.length > 0) {
                     if (completed.length === tasks.length) {
                         statusClass = 'completed';
+                        isCompleted = true;
                     } else if (completed.length > 0) {
                         statusClass = 'partial';
                     }
@@ -795,15 +841,28 @@
                     statusClass += ' today';
                 }
 
+                // Check if this is a milestone day
+                let rewardText = '';
+                if (milestoneRewards[dayNumber]) {
+                    if (isCompleted) {
+                        rewardText = `<span class="reward-text earned">${milestoneRewards[dayNumber]}</span>`;
+                    } else {
+                        rewardText = `<span class="reward-text">${milestoneRewards[dayNumber]}</span>`;
+                    }
+                    statusClass += ' milestone';
+                }
+
                 const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                 html += `
                     <div class="calendar-day ${statusClass}" onclick="goToDate('${dateStr}')">
                         <span class="day-num">${currentDay.getDate()}</span>
                         <span class="month">${monthNames[currentDay.getMonth()]}</span>
+                        ${rewardText}
                     </div>
                 `;
 
                 currentDay.setDate(currentDay.getDate() + 1);
+                dayNumber++;
             }
 
             // Add "Exams Start" box
