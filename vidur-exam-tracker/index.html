@@ -439,11 +439,252 @@
         }
 
         @media (max-width: 600px) {
-            .stats-grid {
-                grid-template-columns: 1fr;
+            body {
+                padding: 12px;
             }
+
+            header {
+                margin-bottom: 20px;
+            }
+
+            header p {
+                font-size: 0.75rem !important;
+                margin-bottom: 8px !important;
+                padding: 0 10px;
+            }
+
+            header h1 {
+                font-size: 1.5rem;
+                margin-bottom: 8px;
+            }
+
+            .streak-badge {
+                padding: 8px 16px;
+                font-size: 1rem;
+            }
+
+            .streak-badge .fire {
+                font-size: 1.2rem;
+            }
+
+            .sync-status {
+                font-size: 0.7rem;
+                margin-top: 8px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 8px;
+                margin-bottom: 15px;
+            }
+
+            .stat-card {
+                padding: 12px 8px;
+                border-radius: 10px;
+            }
+
+            .stat-card .number {
+                font-size: 1.4rem;
+            }
+
+            .stat-card .label {
+                font-size: 0.65rem;
+            }
+
+            .card {
+                padding: 15px;
+                border-radius: 12px;
+                margin-bottom: 15px;
+            }
+
+            .card h2 {
+                font-size: 1rem;
+                margin-bottom: 15px;
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .card h2 > span:first-child {
+                display: none;
+            }
+
+            .date-nav {
+                width: 100%;
+                justify-content: center;
+                gap: 12px;
+            }
+
+            .date-nav button {
+                width: 32px;
+                height: 32px;
+                font-size: 1rem;
+            }
+
+            .date-nav span {
+                font-size: 0.95rem;
+                min-width: 120px;
+            }
+
+            .task-item {
+                padding: 12px;
+                margin-bottom: 8px;
+                border-radius: 8px;
+            }
+
+            .task-item input[type="checkbox"] {
+                width: 20px;
+                height: 20px;
+                margin-right: 10px;
+            }
+
+            .task-item label {
+                font-size: 0.85rem;
+                line-height: 1.3;
+            }
+
+            .subject-tag {
+                padding: 3px 8px;
+                font-size: 0.65rem;
+                margin-right: 6px;
+                display: inline-block;
+                margin-bottom: 4px;
+            }
+
+            .delete-btn {
+                padding: 3px;
+                font-size: 0.9rem;
+            }
+
+            .progress-bar {
+                height: 6px;
+                margin-top: 12px;
+            }
+
+            .add-task-section {
+                margin-top: 15px;
+                padding-top: 15px;
+            }
+
+            .add-task-row {
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .add-task-row input {
+                padding: 10px;
+                font-size: 0.9rem;
+            }
+
+            .add-task-row button {
+                padding: 10px 20px;
+                font-size: 0.9rem;
+            }
+
+            .calendar-grid {
+                grid-template-columns: repeat(5, 1fr);
+                gap: 6px;
+            }
+
+            .calendar-day {
+                border-radius: 6px;
+                font-size: 0.75rem;
+            }
+
+            .calendar-day .day-num {
+                font-size: 0.9rem;
+            }
+
+            .calendar-day .month {
+                font-size: 0.55rem;
+            }
+
+            .calendar-day.exam-day .day-num {
+                font-size: 0.5rem !important;
+            }
+
+            .calendar-day.exam-day .month {
+                font-size: 0.45rem;
+            }
+
+            .reward-text {
+                font-size: 0.35rem;
+                bottom: 1px;
+            }
+
+            .reward-banner {
+                padding: 10px 12px;
+                font-size: 0.8rem;
+                margin-bottom: 12px;
+                border-radius: 8px;
+            }
+
+            .reward-banner .reward-icon {
+                font-size: 1rem;
+                margin-right: 6px;
+            }
+
+            .no-tasks {
+                padding: 25px;
+                font-size: 0.9rem;
+            }
+
+            .edit-section textarea {
+                height: 120px;
+                padding: 12px;
+                font-size: 0.85rem;
+            }
+
+            .edit-actions {
+                gap: 8px;
+            }
+
+            .btn-save, .btn-cancel {
+                padding: 8px 16px;
+                font-size: 0.85rem;
+            }
+        }
+
+        /* Extra small screens */
+        @media (max-width: 380px) {
+            body {
+                padding: 8px;
+            }
+
+            header h1 {
+                font-size: 1.3rem;
+            }
+
+            .stats-grid {
+                gap: 6px;
+            }
+
+            .stat-card {
+                padding: 10px 6px;
+            }
+
+            .stat-card .number {
+                font-size: 1.2rem;
+            }
+
+            .stat-card .label {
+                font-size: 0.6rem;
+            }
+
             .calendar-grid {
                 grid-template-columns: repeat(4, 1fr);
+                gap: 5px;
+            }
+
+            .calendar-day .day-num {
+                font-size: 0.8rem;
+            }
+
+            .calendar-day .month {
+                font-size: 0.5rem;
+            }
+
+            .reward-text {
+                display: none;
             }
         }
     </style>
