@@ -13,7 +13,7 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #f5f5f5;
             min-height: 100vh;
             padding: 20px;
         }
@@ -25,23 +25,26 @@
 
         header {
             text-align: center;
-            color: white;
+            color: #333;
             margin-bottom: 30px;
         }
 
         header h1 {
             font-size: 2rem;
             margin-bottom: 10px;
+            font-weight: 600;
         }
 
         .streak-badge {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            background: rgba(255,255,255,0.2);
+            background: #fff;
             padding: 10px 20px;
             border-radius: 50px;
             font-size: 1.2rem;
+            border: 1px solid #e0e0e0;
+            color: #333;
         }
 
         .streak-badge .fire {
@@ -51,15 +54,14 @@
         .sync-status {
             font-size: 0.8rem;
             margin-top: 10px;
-            opacity: 0.8;
         }
 
         .sync-status.connected {
-            color: #90EE90;
+            color: #4caf50;
         }
 
         .sync-status.disconnected {
-            color: #FFB6C1;
+            color: #f44336;
         }
 
         .stats-grid {
@@ -74,27 +76,27 @@
             border-radius: 12px;
             padding: 20px;
             text-align: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border: 1px solid #e0e0e0;
         }
 
         .stat-card .number {
             font-size: 2rem;
-            font-weight: bold;
-            color: #667eea;
+            font-weight: 600;
+            color: #333;
         }
 
         .stat-card .label {
-            color: #666;
+            color: #888;
             font-size: 0.9rem;
             margin-top: 5px;
         }
 
         .card {
             background: white;
-            border-radius: 16px;
+            border-radius: 12px;
             padding: 25px;
             margin-bottom: 20px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            border: 1px solid #e0e0e0;
         }
 
         .card h2 {
@@ -103,6 +105,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            font-weight: 600;
         }
 
         .date-nav {
@@ -112,7 +115,7 @@
         }
 
         .date-nav button {
-            background: #667eea;
+            background: #333;
             color: white;
             border: none;
             width: 36px;
@@ -120,11 +123,11 @@
             border-radius: 50%;
             cursor: pointer;
             font-size: 1.2rem;
-            transition: transform 0.2s;
+            transition: background 0.2s;
         }
 
         .date-nav button:hover {
-            transform: scale(1.1);
+            background: #555;
         }
 
         .date-nav span {
@@ -141,18 +144,20 @@
             display: flex;
             align-items: center;
             padding: 15px;
-            border-radius: 10px;
+            border-radius: 8px;
             margin-bottom: 10px;
-            background: #f8f9fa;
-            transition: all 0.3s;
+            background: #fafafa;
+            border: 1px solid #eee;
+            transition: all 0.2s;
         }
 
         .task-item:hover {
-            background: #e9ecef;
+            background: #f0f0f0;
         }
 
         .task-item.completed {
-            background: #d4edda;
+            background: #e8f5e9;
+            border-color: #c8e6c9;
         }
 
         .task-item input[type="checkbox"] {
@@ -160,47 +165,48 @@
             height: 22px;
             margin-right: 15px;
             cursor: pointer;
-            accent-color: #667eea;
+            accent-color: #4caf50;
         }
 
         .task-item label {
             flex: 1;
             cursor: pointer;
             font-size: 1rem;
+            color: #333;
         }
 
         .task-item.completed label {
             text-decoration: line-through;
-            color: #666;
+            color: #888;
         }
 
         .subject-tag {
-            background: #667eea;
+            background: #333;
             color: white;
             padding: 4px 10px;
-            border-radius: 20px;
+            border-radius: 4px;
             font-size: 0.75rem;
             margin-right: 10px;
         }
 
         .no-tasks {
             text-align: center;
-            color: #666;
+            color: #888;
             padding: 40px;
         }
 
         .edit-btn {
             background: none;
-            border: 1px solid #667eea;
-            color: #667eea;
+            border: 1px solid #333;
+            color: #333;
             padding: 8px 16px;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
             font-size: 0.9rem;
         }
 
         .edit-btn:hover {
-            background: #667eea;
+            background: #333;
             color: white;
         }
 
@@ -219,8 +225,8 @@
             width: 100%;
             height: 150px;
             padding: 15px;
-            border: 2px solid #e9ecef;
-            border-radius: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
             font-family: inherit;
             font-size: 0.95rem;
             resize: vertical;
@@ -228,7 +234,7 @@
 
         .edit-section textarea:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: #333;
         }
 
         .edit-actions {
@@ -238,35 +244,35 @@
         }
 
         .btn-save {
-            background: #28a745;
+            background: #4caf50;
             color: white;
             border: none;
             padding: 10px 20px;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
         }
 
         .btn-cancel {
-            background: #dc3545;
-            color: white;
-            border: none;
+            background: #f5f5f5;
+            color: #333;
+            border: 1px solid #ddd;
             padding: 10px 20px;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
         }
 
         .progress-bar {
-            height: 8px;
-            background: #e9ecef;
-            border-radius: 4px;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
             margin-top: 15px;
             overflow: hidden;
         }
 
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, #667eea, #764ba2);
-            border-radius: 4px;
+            background: #4caf50;
+            border-radius: 3px;
             transition: width 0.5s ease;
         }
 
@@ -285,29 +291,33 @@
             justify-content: center;
             border-radius: 8px;
             font-size: 0.85rem;
-            background: #f8f9fa;
+            background: #fafafa;
+            border: 1px solid #eee;
             cursor: pointer;
-            transition: transform 0.2s;
+            transition: all 0.2s;
         }
 
         .calendar-day:hover {
-            transform: scale(1.05);
+            background: #f0f0f0;
         }
 
         .calendar-day.today {
-            border: 2px solid #667eea;
+            border: 2px solid #333;
         }
 
         .calendar-day.completed {
-            background: #d4edda;
+            background: #e8f5e9;
+            border-color: #c8e6c9;
         }
 
         .calendar-day.partial {
-            background: #fff3cd;
+            background: #fff8e1;
+            border-color: #ffecb3;
         }
 
         .calendar-day.exam-day {
-            background: linear-gradient(135deg, #28a745, #20c997);
+            background: #4caf50;
+            border-color: #4caf50;
             color: white;
             cursor: default;
         }
@@ -334,12 +344,13 @@
         }
 
         .reward-text.earned {
-            color: #28a745;
+            color: #4caf50;
             font-weight: bold;
         }
 
         .calendar-day.milestone.completed {
-            background: linear-gradient(135deg, #28a745, #20c997);
+            background: #4caf50;
+            border-color: #4caf50;
         }
 
         .calendar-day.milestone.completed .day-num,
@@ -352,18 +363,20 @@
         }
 
         .reward-banner {
-            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
-            border-radius: 10px;
+            background: #fff8e1;
+            border: 1px solid #ffecb3;
+            border-radius: 8px;
             padding: 12px 15px;
             margin-bottom: 15px;
             text-align: center;
             font-size: 0.95rem;
-            color: #8b4513;
+            color: #5d4037;
         }
 
         .reward-banner.earned {
-            background: linear-gradient(135deg, #a8e063 0%, #56ab2f 100%);
-            color: white;
+            background: #e8f5e9;
+            border-color: #c8e6c9;
+            color: #2e7d32;
         }
 
         .reward-banner .reward-icon {
@@ -372,16 +385,17 @@
         }
 
         .reward-banner .reward-name {
-            font-weight: bold;
+            font-weight: 600;
         }
 
         .calendar-day .day-num {
-            font-weight: bold;
+            font-weight: 600;
+            color: #333;
         }
 
         .calendar-day .month {
             font-size: 0.7rem;
-            color: #666;
+            color: #888;
         }
 
         .add-task-section {
@@ -398,44 +412,47 @@
         .add-task-row input {
             flex: 1;
             padding: 12px;
-            border: 2px solid #e9ecef;
-            border-radius: 8px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
             font-size: 1rem;
         }
 
         .add-task-row input:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: #333;
         }
 
         .add-task-row button {
-            background: #667eea;
+            background: #333;
             color: white;
             border: none;
             padding: 12px 24px;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
             font-size: 1rem;
+        }
+
+        .add-task-row button:hover {
+            background: #555;
         }
 
         .delete-btn {
             background: none;
             border: none;
-            color: #dc3545;
+            color: #999;
             cursor: pointer;
             padding: 5px;
-            opacity: 0.5;
-            transition: opacity 0.2s;
+            transition: color 0.2s;
         }
 
         .delete-btn:hover {
-            opacity: 1;
+            color: #f44336;
         }
 
         .loading {
             text-align: center;
             padding: 40px;
-            color: #666;
+            color: #888;
         }
 
         @media (max-width: 600px) {
@@ -451,6 +468,7 @@
                 font-size: 0.75rem !important;
                 margin-bottom: 8px !important;
                 padding: 0 10px;
+                color: #666;
             }
 
             header h1 {
@@ -493,7 +511,7 @@
 
             .card {
                 padding: 15px;
-                border-radius: 12px;
+                border-radius: 10px;
                 margin-bottom: 15px;
             }
 
@@ -556,7 +574,7 @@
             }
 
             .progress-bar {
-                height: 6px;
+                height: 5px;
                 margin-top: 12px;
             }
 
@@ -692,7 +710,7 @@
 <body>
     <div class="container">
         <header>
-            <p style="font-size: 0.85rem; opacity: 0.85; margin-bottom: 12px; max-width: 480px; margin-left: auto; margin-right: auto; line-height: 1.4;">
+            <p style="font-size: 0.85rem; color: #666; margin-bottom: 12px; max-width: 480px; margin-left: auto; margin-right: auto; line-height: 1.4;">
                 Results are their own achievement, but you have little control over them. What you can control is your effort — and giving 100% every day is a victory in itself.
             </p>
             <h1>Vidur's Exam Tracker</h1>
