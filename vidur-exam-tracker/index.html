@@ -597,7 +597,13 @@
             database.ref('timetable').on('value', (snapshot) => {
                 const data = snapshot.val();
                 if (data) {
-                    timetable = data;
+                    // Merge with default timetable to ensure no dates are missing
+                    timetable = { ...defaultTimetable };
+                    Object.keys(data).forEach(dateStr => {
+                        if (data[dateStr] && data[dateStr].length > 0) {
+                            timetable[dateStr] = data[dateStr];
+                        }
+                    });
                 } else {
                     // Initialize with default timetable
                     timetable = { ...defaultTimetable };
