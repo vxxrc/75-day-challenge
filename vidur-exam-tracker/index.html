@@ -543,6 +543,7 @@
 
         // Initial timetable data
         const defaultTimetable = {
+            "2026-02-09": [], // Added day - tasks can be added via the app
             "2026-02-10": ["Chemistry - chapters 1 to 4", "Maths - Rational, Irrational numbers or Maths paper"],
             "2026-02-11": ["Maths - Compound Interest"],
             "2026-02-12": ["English - Literature paper for test"],
@@ -870,7 +871,7 @@
 
         function renderCalendar() {
             const calendarGrid = document.getElementById('calendarGrid');
-            const startDate = new Date('2026-02-10T00:00:00');
+            const startDate = new Date('2026-02-09T00:00:00');
             const endDate = new Date('2026-02-28T00:00:00');
             const today = formatDate(new Date());
 
