@@ -20,9 +20,9 @@
 <script type="text/babel">
     const { useState, useEffect, useRef, useCallback } = React;
 
-    const CHALLENGE_START = '2026-03-01';
+    const CHALLENGE_START = '2026-02-24';
     const CHALLENGE_END   = '2026-08-31';
-    const TOTAL_DAYS      = 184;
+    const TOTAL_DAYS      = 189;
     const HYROX_DATE      = '2026-11-15';
 
     function fmtDate(d) {
@@ -91,7 +91,7 @@
             <div className="min-h-screen bg-slate-50">
                 {/* Header */}
                 <div className="bg-white border-b border-slate-200 sticky top-0 z-20">
-                    <div className="max-w-2xl mx-auto px-4 pt-4 pb-0 flex items-start justify-between">
+                    <div className="max-w-7xl mx-auto px-6 pt-4 pb-0 flex items-start justify-between">
                         <div>
                             <h1 className="text-lg font-bold text-slate-800 leading-tight">6 Month Challenge</h1>
                             <p className="text-xs text-slate-400 mt-0.5">
@@ -102,7 +102,7 @@
                             {new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}
                         </div>
                     </div>
-                    <div className="max-w-2xl mx-auto px-4 flex gap-0 overflow-x-auto">
+                    <div className="max-w-7xl mx-auto px-6 flex gap-0 overflow-x-auto">
                         {TABS.map(t => (
                             <button key={t.id} onClick={() => setView(t.id)}
                                 className={`px-3 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
@@ -113,7 +113,7 @@
                     </div>
                 </div>
 
-                <div className="max-w-2xl mx-auto px-4 py-6 pb-16">
+                <div className="max-w-7xl mx-auto px-6 py-6 pb-16">
                     {view==='dashboard' && <Dashboard data={data} today={today} challDay={challDay} />}
                     {view==='today'     && <TodayLog  data={data} today={today} updateDay={updateDay} />}
                     {view==='progress'  && <Progress  data={data} today={today} />}
@@ -179,7 +179,7 @@
                 {/* 4 Main Goals */}
                 <div>
                     <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Main Goals</p>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
 
                         {/* ISB */}
                         <GoalCard color="bg-blue-600">
@@ -240,12 +240,12 @@
                     </div>
                 </div>
 
-                {/* Challenge progress bar */}
+                {/* Challenge progress bar - full width */}
                 <div className="bg-white rounded-2xl p-5 border border-slate-100">
                     <div className="flex justify-between items-end mb-3">
                         <div>
                             <p className="font-semibold text-slate-800">6 Month Challenge</p>
-                            <p className="text-xs text-slate-400">Mar 1 – Aug 31, 2026</p>
+                            <p className="text-xs text-slate-400">Feb 24 – Aug 31, 2026</p>
                         </div>
                         <div className="text-right">
                             <span className="text-2xl font-bold text-blue-600">{pct}%</span>
@@ -257,37 +257,47 @@
                     </div>
                 </div>
 
-                {/* This Week */}
-                <div className="bg-white rounded-2xl p-5 border border-slate-100">
-                    <p className="font-semibold text-slate-800 mb-4">This Week</p>
-                    <div className="space-y-3">
-                        <HBar label="🏋️ Gym"       val={wk.gym}      max={4}  color="bg-emerald-500" />
-                        <HBar label="🏃 Running"    val={wk.running}  max={4}  color="bg-sky-500" />
-                        <HBar label="🍵 Green Tea"  val={wk.greenTea} max={5}  color="bg-teal-500" />
-                        <HBar label="📚 Study"      val={wk.study}    max={21} color="bg-blue-500"    unit="h" dec={1} />
-                        <HBar label="💼 Work"       val={wk.work}     max={40} color="bg-violet-500"  unit="h" dec={1} />
-                    </div>
-                    <div className="flex gap-4 mt-3 text-xs text-slate-400 pt-3 border-t border-slate-50">
-                        <span>🍔 Outside food: {wk.outside}d</span>
-                        <span>🎉 Cheat meals: {wk.cheat}</span>
-                    </div>
-                </div>
-
-                {/* Streak */}
-                {streak > 0 && (
-                    <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex items-center gap-3">
-                        <span className="text-3xl">🔥</span>
-                        <div>
-                            <p className="font-bold text-orange-700">{streak} Day Study Streak</p>
-                            <p className="text-xs text-orange-500">You're on a roll. Don't break it.</p>
+                {/* 2-column on desktop */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* This Week - takes 2/3 */}
+                    <div className="md:col-span-2 bg-white rounded-2xl p-5 border border-slate-100">
+                        <p className="font-semibold text-slate-800 mb-4">This Week</p>
+                        <div className="space-y-3">
+                            <HBar label="🏋️ Gym"       val={wk.gym}      max={4}  color="bg-emerald-500" />
+                            <HBar label="🏃 Running"    val={wk.running}  max={4}  color="bg-sky-500" />
+                            <HBar label="🍵 Green Tea"  val={wk.greenTea} max={5}  color="bg-teal-500" />
+                            <HBar label="📚 Study"      val={wk.study}    max={21} color="bg-blue-500"    unit="h" dec={1} />
+                            <HBar label="💼 Work"       val={wk.work}     max={40} color="bg-violet-500"  unit="h" dec={1} />
+                        </div>
+                        <div className="flex gap-4 mt-3 text-xs text-slate-400 pt-3 border-t border-slate-50">
+                            <span>🍔 Outside food: {wk.outside}d</span>
+                            <span>🎉 Cheat meals: {wk.cheat}</span>
                         </div>
                     </div>
-                )}
 
-                {/* Quote */}
-                <div className="bg-slate-800 text-white rounded-2xl p-5 text-center">
-                    <p className="text-sm italic opacity-90 leading-relaxed">"We are what we repeatedly do. Excellence, then, is not an act but a habit."</p>
-                    <p className="text-xs opacity-40 mt-2">— Aristotle</p>
+                    {/* Right column - streak + quote */}
+                    <div className="flex flex-col gap-4">
+                        {streak > 0 ? (
+                            <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5 flex items-center gap-3">
+                                <span className="text-4xl">🔥</span>
+                                <div>
+                                    <p className="font-bold text-orange-700 text-lg">{streak}</p>
+                                    <p className="text-sm font-medium text-orange-700">Day Streak</p>
+                                    <p className="text-xs text-orange-400 mt-0.5">Don't break it.</p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 text-center">
+                                <p className="text-3xl mb-1">🎯</p>
+                                <p className="text-sm font-medium text-slate-600">Start your streak</p>
+                                <p className="text-xs text-slate-400 mt-0.5">Log 3h study today</p>
+                            </div>
+                        )}
+                        <div className="bg-slate-800 text-white rounded-2xl p-5 flex-1 flex flex-col justify-center">
+                            <p className="text-sm italic opacity-90 leading-relaxed">"We are what we repeatedly do. Excellence, then, is not an act but a habit."</p>
+                            <p className="text-xs opacity-40 mt-3">— Aristotle</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         );
@@ -351,100 +361,104 @@
         return (
             <div className="space-y-4">
                 {/* Date header */}
-                <div className="text-center pb-2">
-                    <h2 className="text-xl font-bold text-slate-800">{dayLabel}</h2>
+                <div className="text-center pb-1">
+                    <h2 className="text-2xl font-bold text-slate-800">{dayLabel}</h2>
                     <p className="text-sm text-slate-400 mt-0.5">
                         {isWeekend(today) ? 'Weekend — 5h study goal' : 'Weekday — 3h study goal'}
                     </p>
                 </div>
 
-                {/* HEALTH */}
-                <LogSection title="🏃 Health" accent="border-l-emerald-500">
-                    <Toggle checked={log.gym}      onChange={() => toggle('gym')}      label="Gym"        sub="Strength session" />
-                    <Toggle checked={log.running}  onChange={() => toggle('running')}  label="Running"    sub="Outdoor / cardio" />
-                    <Toggle checked={log.greenTea} onChange={() => toggle('greenTea')} label="Green Tea"  sub="Had green tea today" />
-                    <div className="grid grid-cols-2 gap-2 pt-1">
-                        <Toggle checked={!log.outsideFood} onChange={() => toggle('outsideFood')} label="No outside food" sub="Home food only" />
-                        <Toggle checked={log.cheatMeal}    onChange={() => toggle('cheatMeal')}   label="Cheat meal"     sub="1 per week ok" warn />
-                    </div>
+                {/* 2-column on desktop */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* LEFT: Health */}
+                    <LogSection title="🏃 Health" accent="border-l-emerald-500">
+                        <Toggle checked={log.gym}      onChange={() => toggle('gym')}      label="Gym"        sub="Strength session" />
+                        <Toggle checked={log.running}  onChange={() => toggle('running')}  label="Running"    sub="Outdoor / cardio" />
+                        <Toggle checked={log.greenTea} onChange={() => toggle('greenTea')} label="Green Tea"  sub="Had green tea today" />
+                        <div className="grid grid-cols-2 gap-2 pt-1">
+                            <Toggle checked={!log.outsideFood} onChange={() => toggle('outsideFood')} label="No outside food" sub="Home food only" />
+                            <Toggle checked={log.cheatMeal}    onChange={() => toggle('cheatMeal')}   label="Cheat meal"     sub="1 per week ok" warn />
+                        </div>
+                        {/* Weight */}
+                        <div className="pt-3 border-t border-slate-100 mt-1">
+                            <label className="text-sm font-medium text-slate-700 block mb-2">⚖️ Weight today</label>
+                            <div className="flex gap-2 items-center">
+                                <input type="number" step="0.1" min="40" max="200"
+                                    value={wInput} onChange={e => setWInput(e.target.value)}
+                                    placeholder={log.weight ? String(log.weight) : "e.g. 84.5"}
+                                    className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-emerald-500"
+                                />
+                                <span className="text-sm text-slate-400">kg</span>
+                                <button onClick={() => { const w=parseFloat(wInput); if(!isNaN(w)) updateDay(today,{weight:w}); }}
+                                    className="px-4 py-2.5 bg-emerald-600 text-white text-sm rounded-xl font-medium hover:bg-emerald-700 transition">
+                                    Save
+                                </button>
+                            </div>
+                            {log.weight && <p className="text-xs text-emerald-600 mt-1.5">✓ {log.weight} kg logged</p>}
+                        </div>
+                    </LogSection>
 
-                    {/* Weight */}
-                    <div className="pt-3 border-t border-slate-100 mt-1">
-                        <label className="text-sm font-medium text-slate-700 block mb-2">⚖️ Weight today</label>
-                        <div className="flex gap-2 items-center">
-                            <input type="number" step="0.1" min="40" max="200"
-                                value={wInput} onChange={e => setWInput(e.target.value)}
-                                placeholder={log.weight ? String(log.weight) : "e.g. 84.5"}
-                                className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-emerald-500"
-                            />
-                            <span className="text-sm text-slate-400">kg</span>
-                            <button onClick={() => { const w=parseFloat(wInput); if(!isNaN(w)) updateDay(today,{weight:w}); }}
-                                className="px-4 py-2.5 bg-emerald-600 text-white text-sm rounded-xl font-medium hover:bg-emerald-700 transition">
-                                Save
-                            </button>
-                        </div>
-                        {log.weight && <p className="text-xs text-emerald-600 mt-1.5">✓ {log.weight} kg logged</p>}
-                    </div>
-                </LogSection>
+                    {/* RIGHT: Studies + Work + Score */}
+                    <div className="space-y-4">
+                        <LogSection title="📚 Studies — ISB Prep" accent="border-l-blue-500">
+                            <div>
+                                <div className="flex justify-between items-center mb-2">
+                                    <label className="text-sm font-medium text-slate-700">Hours studied today</label>
+                                    <span className="text-xs text-slate-400">Goal: {studyTarget}h</span>
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                    <input type="number" step="0.5" min="0" max="16"
+                                        value={studyInput} onChange={e => setStudyInput(e.target.value)}
+                                        placeholder="0"
+                                        className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500"
+                                    />
+                                    <span className="text-sm text-slate-400">hrs</span>
+                                    <button onClick={() => { const h=parseFloat(studyInput); if(!isNaN(h)) updateDay(today,{studyHours:h}); }}
+                                        className="px-4 py-2.5 bg-blue-600 text-white text-sm rounded-xl font-medium hover:bg-blue-700 transition">
+                                        Save
+                                    </button>
+                                </div>
+                                {studyH > 0 && (
+                                    <p className={`text-xs mt-1.5 ${studyH>=studyTarget ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                        {studyH>=studyTarget ? `✓ Goal met! ${studyH}h logged` : `${studyH}h logged — ${(studyTarget-studyH).toFixed(1)}h to go`}
+                                    </p>
+                                )}
+                            </div>
+                            <p className="text-xs text-slate-400">GMAT prep / case studies / essays / profile building</p>
+                        </LogSection>
 
-                {/* STUDIES */}
-                <LogSection title="📚 Studies — ISB Prep" accent="border-l-blue-500">
-                    <div>
-                        <div className="flex justify-between items-center mb-2">
-                            <label className="text-sm font-medium text-slate-700">Hours studied today</label>
-                            <span className="text-xs text-slate-400">Goal: {studyTarget}h</span>
-                        </div>
-                        <div className="flex gap-2 items-center">
-                            <input type="number" step="0.5" min="0" max="16"
-                                value={studyInput} onChange={e => setStudyInput(e.target.value)}
-                                placeholder="0"
-                                className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500"
-                            />
-                            <span className="text-sm text-slate-400">hrs</span>
-                            <button onClick={() => { const h=parseFloat(studyInput); if(!isNaN(h)) updateDay(today,{studyHours:h}); }}
-                                className="px-4 py-2.5 bg-blue-600 text-white text-sm rounded-xl font-medium hover:bg-blue-700 transition">
-                                Save
-                            </button>
-                        </div>
-                        {studyH > 0 && (
-                            <p className={`text-xs mt-1.5 ${studyH>=studyTarget ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                {studyH>=studyTarget ? `✓ Goal met! ${studyH}h logged` : `${studyH}h logged — ${(studyTarget-studyH).toFixed(1)}h to go`}
+                        <LogSection title="💼 Focused Work" accent="border-l-violet-500">
+                            <div>
+                                <label className="text-sm font-medium text-slate-700 block mb-2">Hours of deep work today</label>
+                                <div className="flex gap-2 items-center">
+                                    <input type="number" step="0.5" min="0" max="16"
+                                        value={workInput} onChange={e => setWorkInput(e.target.value)}
+                                        placeholder="0"
+                                        className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-violet-500"
+                                    />
+                                    <span className="text-sm text-slate-400">hrs</span>
+                                    <button onClick={() => { const h=parseFloat(workInput); if(!isNaN(h)) updateDay(today,{workHours:h}); }}
+                                        className="px-4 py-2.5 bg-violet-600 text-white text-sm rounded-xl font-medium hover:bg-violet-700 transition">
+                                        Save
+                                    </button>
+                                </div>
+                                {workH > 0 && <p className="text-xs text-violet-600 mt-1.5">✓ {workH}h focused work logged</p>}
+                            </div>
+                            <p className="text-xs text-slate-400">No distractions — phone away, full focus sessions only</p>
+                        </LogSection>
+
+                        {/* Day score */}
+                        <div className={`rounded-2xl p-5 text-center border ${goalsMet >= 4 ? 'bg-emerald-50 border-emerald-200' : goalsMet >= 2 ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
+                            <div className="text-4xl mb-2">{goalsMet >= 5 ? '🔥' : goalsMet >= 3 ? '💪' : '⏳'}</div>
+                            <p className={`text-xl font-bold ${goalsMet>=4?'text-emerald-700':goalsMet>=2?'text-amber-700':'text-slate-500'}`}>
+                                {goalsMet}/5
                             </p>
-                        )}
-                    </div>
-                    <p className="text-xs text-slate-400">GMAT prep / case studies / essays / profile building</p>
-                </LogSection>
-
-                {/* WORK */}
-                <LogSection title="💼 Focused Work" accent="border-l-violet-500">
-                    <div>
-                        <label className="text-sm font-medium text-slate-700 block mb-2">Hours of deep work today</label>
-                        <div className="flex gap-2 items-center">
-                            <input type="number" step="0.5" min="0" max="16"
-                                value={workInput} onChange={e => setWorkInput(e.target.value)}
-                                placeholder="0"
-                                className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-violet-500"
-                            />
-                            <span className="text-sm text-slate-400">hrs</span>
-                            <button onClick={() => { const h=parseFloat(workInput); if(!isNaN(h)) updateDay(today,{workHours:h}); }}
-                                className="px-4 py-2.5 bg-violet-600 text-white text-sm rounded-xl font-medium hover:bg-violet-700 transition">
-                                Save
-                            </button>
+                            <p className="text-sm text-slate-500 mt-0.5">goals hit today</p>
+                            <p className="text-xs text-slate-400 mt-1">
+                                {goalsMet===5 ? 'Perfect day. Absolutely elite.' : goalsMet>=3 ? 'Solid effort. Push further.' : 'Every bit counts. Keep moving.'}
+                            </p>
                         </div>
-                        {workH > 0 && <p className="text-xs text-violet-600 mt-1.5">✓ {workH}h focused work logged</p>}
                     </div>
-                    <p className="text-xs text-slate-400">No distractions — phone away, full focus sessions only</p>
-                </LogSection>
-
-                {/* Day score */}
-                <div className={`rounded-2xl p-4 text-center border ${goalsMet >= 4 ? 'bg-emerald-50 border-emerald-200' : goalsMet >= 2 ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
-                    <div className="text-3xl mb-1">{goalsMet >= 5 ? '🔥' : goalsMet >= 3 ? '💪' : '⏳'}</div>
-                    <p className={`font-bold ${goalsMet>=4?'text-emerald-700':goalsMet>=2?'text-amber-700':'text-slate-500'}`}>
-                        {goalsMet}/5 goals hit today
-                    </p>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                        {goalsMet===5 ? 'Absolutely elite. Perfect day!' : goalsMet>=3 ? 'Solid effort. Push further.' : 'Every bit counts. Keep moving.'}
-                    </p>
                 </div>
             </div>
         );
@@ -497,8 +511,8 @@
 
         // Monthly breakdown
         const months = [
-            {key:'2026-03',label:'March'},{key:'2026-04',label:'April'},{key:'2026-05',label:'May'},
-            {key:'2026-06',label:'June'},{key:'2026-07',label:'July'},{key:'2026-08',label:'August'}
+            {key:'2026-02',label:'Feb (start)'},{key:'2026-03',label:'March'},{key:'2026-04',label:'April'},
+            {key:'2026-05',label:'May'},{key:'2026-06',label:'June'},{key:'2026-07',label:'July'},{key:'2026-08',label:'August'}
         ];
         const mStats = k => {
             const ents = Object.entries(logs).filter(([d]) => d.startsWith(k));
@@ -785,12 +799,13 @@
         const [editNotes, setEditNotes] = useState({ health:'', studies:'', work:'' });
 
         const MONTHS = [
-            { key:'2026-03', label:'March 2026',     theme:'Build the foundation' },
-            { key:'2026-04', label:'April 2026',     theme:'Consistency over intensity' },
-            { key:'2026-05', label:'May 2026',       theme:'Momentum builds' },
-            { key:'2026-06', label:'June 2026',      theme:'Final push on weight' },
-            { key:'2026-07', label:'July 2026 🎯',   theme:'78 kg target — then rebuild' },
-            { key:'2026-08', label:'August 2026',    theme:'ISB application season' },
+            { key:'2026-02', label:'Feb 2026 (start)', theme:'Light the fire' },
+            { key:'2026-03', label:'March 2026',        theme:'Build the foundation' },
+            { key:'2026-04', label:'April 2026',        theme:'Consistency over intensity' },
+            { key:'2026-05', label:'May 2026',          theme:'Momentum builds' },
+            { key:'2026-06', label:'June 2026',         theme:'Final push on weight' },
+            { key:'2026-07', label:'July 2026 🎯',      theme:'78 kg target — then rebuild' },
+            { key:'2026-08', label:'August 2026',       theme:'ISB application season' },
         ];
 
         const startEdit = k => {
