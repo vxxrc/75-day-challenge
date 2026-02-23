@@ -914,9 +914,15 @@
         const delta  = nw!==null && prev ? nw-calcNW(prev) : null;
         const nwPct  = nw!==null ? Math.min(100,(nw/NW_GOAL)*100) : 0;
 
-        // Bimonthly reminder
-        const daysSince = latest ? daysBetween(latest.date, today) : 999;
-        const showReminder = daysSince > 13;
+        // Reminder on 3rd and 18th of each month
+        const period3rd  = `${today.substring(0,7)}-03`;
+        const period18th = `${today.substring(0,7)}-18`;
+        let showReminder = false;
+        if (today >= period3rd && today < period18th) {
+            showReminder = !logs.some(l => l.date >= period3rd);
+        } else if (today >= period18th) {
+            showReminder = !logs.some(l => l.date >= period18th);
+        }
 
         const setF = (k,v) => setForm(f=>({...f,[k]:v}));
         const startAdd = () => { setForm({date:fmtDate(new Date()),demat:'',crypto:'',bank:'',creditCard:''});setEditDate(null);setShowForm(true); };
@@ -941,8 +947,8 @@
                     <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3">
                         <span className="text-2xl">📊</span>
                         <div className="flex-1">
-                            <p className="font-semibold text-amber-800 text-sm">Time for your bimonthly snapshot</p>
-                            <p className="text-xs text-amber-600 mt-0.5">{latest?`Last logged ${daysSince} days ago (${latest.date})`:'Never logged — log your first entry.'}</p>
+                            <p className="font-semibold text-amber-800 text-sm">Time to log your net worth</p>
+                            <p className="text-xs text-amber-600 mt-0.5">{latest?`Last entry: ${latest.date}`:'Never logged — add your first snapshot.'} Scheduled on the 3rd &amp; 18th.</p>
                         </div>
                         <button onClick={startAdd} className="text-xs bg-amber-500 text-white px-3 py-1.5 rounded-xl font-medium hover:bg-amber-600 transition">Log now</button>
                     </div>
