@@ -4,108 +4,86 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>6 Month Challenge</title>
-
-    <!-- PWA -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1e40af">
-
-    <!-- iOS home screen -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="6MC">
     <link rel="apple-touch-icon" href="icon.svg">
-
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            padding-top: env(safe-area-inset-top);
-            padding-bottom: env(safe-area-inset-bottom);
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
         input[type=number]::-webkit-inner-spin-button { opacity: 1; }
     </style>
-
     <script>
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(r => console.log('SW registered:', r.scope))
-                    .catch(e => console.log('SW failed:', e));
-            });
+            window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
         }
     </script>
 </head>
 <body class="bg-slate-50">
 <div id="root"></div>
-
 <script type="text/babel">
     const { useState, useEffect, useRef, useCallback } = React;
 
     const CHALLENGE_START = '2026-02-24';
-    const CHALLENGE_END   = '2026-08-31';
     const TOTAL_DAYS      = 189;
     const HYROX_DATE      = '2026-11-15';
-    const NW_GOAL         = 600000; // ₹6L
+    const NW_GOAL         = 600000;
 
-    function fmtDate(d) {
-        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    }
-    function parseD(s) { return new Date(s + 'T00:00:00'); }
-    function isWeekend(s) { const d = parseD(s).getDay(); return d === 0 || d === 6; }
+    const MONTHS = [
+        { key:'2026-02', label:'Feb 2026', theme:'Light the fire' },
+        { key:'2026-03', label:'March 2026', theme:'Build the foundation' },
+        { key:'2026-04', label:'April 2026', theme:'Consistency over intensity' },
+        { key:'2026-05', label:'May 2026', theme:'Momentum builds' },
+        { key:'2026-06', label:'June 2026', theme:'Final push on weight' },
+        { key:'2026-07', label:'July 2026 🎯', theme:'78 kg target — then rebuild' },
+        { key:'2026-08', label:'August 2026', theme:'ISB application season' },
+    ];
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    const fmtDate = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const parseD  = s => new Date(s + 'T00:00:00');
+    const isWeekend = s => { const d = parseD(s).getDay(); return d===0||d===6; };
+    const daysBetween = (a,b) => Math.round((parseD(b)-parseD(a))/86400000);
     function getWeekStart(s) {
-        const d = parseD(s); const day = d.getDay();
-        d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-        return fmtDate(d);
+        const d = parseD(s), day = d.getDay();
+        d.setDate(d.getDate()-(day===0?6:day-1)); return fmtDate(d);
     }
     function getWeekDates(ws) {
-        return Array.from({length:7}, (_,i) => { const d = parseD(ws); d.setDate(d.getDate()+i); return fmtDate(d); });
+        return Array.from({length:7},(_,i)=>{const d=parseD(ws);d.setDate(d.getDate()+i);return fmtDate(d);});
     }
-    function daysBetween(a, b) { return Math.round((parseD(b) - parseD(a)) / 86400000); }
-
     function fmtMoney(n, priv) {
         if (priv) return '₹ ••••';
         if (n >= 100000) return `₹${(n/100000).toFixed(2)}L`;
         if (n >= 1000)   return `₹${(n/1000).toFixed(1)}k`;
         return `₹${n.toLocaleString('en-IN')}`;
     }
-    function fmtMoneyRaw(n, priv) {
-        if (priv) return '••••';
-        return `₹${n.toLocaleString('en-IN')}`;
-    }
-    function calcNW(entry) {
-        return (entry.demat||0) + (entry.crypto||0) + (entry.bank||0) - (entry.creditCard||0);
-    }
+    const calcNW = e => (e.demat||0)+(e.crypto||0)+(e.bank||0)-(e.creditCard||0);
+    const emptyDay = () => ({ gym:false,running:false,greenTea:false,outsideFood:false,cheatMeal:false,weight:null,studyHours:0,workHours:0,pagesRead:0,readingBookId:null });
+    const initData = () => ({ dailyLogs:{},books:[],currentBookId:null,monthlyNotes:{},netWorthLogs:[] });
 
-    const emptyDay = () => ({
-        gym:false, running:false, greenTea:false, outsideFood:false, cheatMeal:false,
-        weight:null, studyHours:0, workHours:0, pagesRead:0, readingBookId:null
-    });
-    const initData = () => ({
-        dailyLogs:{}, books:[], currentBookId:null, monthlyNotes:{}, netWorthLogs:[]
-    });
-
-    // ─── APP ──────────────────────────────────────────────────────────────────
+    // ── APP ───────────────────────────────────────────────────────────────────
     function App() {
-        const [view, setView]       = useState('dashboard');
+        const [view, setView]       = useState('home');
         const [data, setData]       = useState(null);
         const [privacy, setPrivacy] = useState(false);
         const today = fmtDate(new Date());
 
         useEffect(() => {
             try {
-                const saved = localStorage.getItem('6mc-v2');
-                const parsed = saved ? JSON.parse(saved) : initData();
-                // Ensure new fields exist on old data
-                if (!parsed.netWorthLogs) parsed.netWorthLogs = [];
-                setData(parsed);
+                const s = localStorage.getItem('6mc-v2');
+                const p = s ? JSON.parse(s) : initData();
+                if (!p.netWorthLogs) p.netWorthLogs = [];
+                setData(p);
             } catch { setData(initData()); }
         }, []);
 
-        const persist = useCallback((nd) => {
+        const persist = useCallback(nd => {
             setData(nd);
             localStorage.setItem('6mc-v2', JSON.stringify(nd));
         }, []);
@@ -113,91 +91,63 @@
         const updateDay = useCallback((dateStr, updates) => {
             setData(prev => {
                 const nd = { ...prev, dailyLogs: { ...prev.dailyLogs,
-                    [dateStr]: { ...(prev.dailyLogs[dateStr] || emptyDay()), ...updates }
+                    [dateStr]: { ...(prev.dailyLogs[dateStr]||emptyDay()), ...updates }
                 }};
                 localStorage.setItem('6mc-v2', JSON.stringify(nd));
                 return nd;
             });
         }, []);
 
-        // Updates both daily reading log AND book's currentPage
         const updateReading = useCallback((dateStr, bookId, pagesRead) => {
             setData(prev => {
-                const todayLog  = prev.dailyLogs[dateStr] || emptyDay();
-                const oldPages  = todayLog.pagesRead  || 0;
-                const oldBookId = todayLog.readingBookId;
-                const bId       = bookId ? Number(bookId) : null;
-
-                const newBooks = prev.books.map(b => {
-                    if (b.id === oldBookId && b.id !== bId && oldPages > 0) {
-                        // Remove old pages from previous book
-                        return { ...b, currentPage: Math.max(0, b.currentPage - oldPages) };
-                    }
-                    if (b.id === bId) {
-                        const delta    = (b.id === oldBookId) ? (pagesRead - oldPages) : pagesRead;
-                        const newPage  = Math.min(b.totalPages, Math.max(0, b.currentPage + delta));
-                        const done     = newPage >= b.totalPages;
-                        return { ...b, currentPage: newPage,
-                            finishedDate: done && !b.finishedDate ? fmtDate(new Date()) : b.finishedDate };
+                const tl = prev.dailyLogs[dateStr]||emptyDay();
+                const oldP = tl.pagesRead||0, oldB = tl.readingBookId;
+                const bId = bookId ? Number(bookId) : null;
+                const books = prev.books.map(b => {
+                    if (b.id===oldB && b.id!==bId && oldP>0) return {...b,currentPage:Math.max(0,b.currentPage-oldP)};
+                    if (b.id===bId) {
+                        const delta = b.id===oldB ? pagesRead-oldP : pagesRead;
+                        const np = Math.min(b.totalPages, Math.max(0, b.currentPage+delta));
+                        return {...b,currentPage:np,finishedDate:np>=b.totalPages&&!b.finishedDate?fmtDate(new Date()):b.finishedDate};
                     }
                     return b;
                 });
-
-                const nd = {
-                    ...prev, books: newBooks,
-                    dailyLogs: { ...prev.dailyLogs,
-                        [dateStr]: { ...(prev.dailyLogs[dateStr] || emptyDay()), pagesRead, readingBookId: bId }
-                    }
-                };
+                const nd = {...prev, books, dailyLogs:{...prev.dailyLogs,[dateStr]:{...(prev.dailyLogs[dateStr]||emptyDay()),pagesRead,readingBookId:bId}}};
                 localStorage.setItem('6mc-v2', JSON.stringify(nd));
                 return nd;
             });
         }, []);
 
-        if (!data) return <div className="flex items-center justify-center h-screen text-slate-400 text-lg">Loading…</div>;
+        if (!data) return <div className="flex items-center justify-center h-screen text-slate-400">Loading…</div>;
 
-        const rawDay   = daysBetween(CHALLENGE_START, today) + 1;
-        const challDay = Math.max(0, Math.min(rawDay, TOTAL_DAYS));
-        const started  = today >= CHALLENGE_START;
+        const challDay = Math.max(0, Math.min(daysBetween(CHALLENGE_START, today)+1, TOTAL_DAYS));
 
         const TABS = [
-            { id:'dashboard', label:'🏠 Home' },
-            { id:'today',     label:'📅 Today' },
-            { id:'progress',  label:'📊 Progress' },
-            { id:'reading',   label:'📖 Reading' },
-            { id:'wealth',    label:'💰 Wealth' },
-            { id:'goals',     label:'🎯 Goals' },
+            { id:'home',    label:'🏠 Home' },
+            { id:'log',     label:'📝 Log' },
+            { id:'isb',     label:'🎓 ISB' },
+            { id:'fitness', label:'🏋️ Fitness' },
+            { id:'reading', label:'📖 Reading' },
+            { id:'work',    label:'💼 Work' },
+            { id:'wealth',  label:'💰 Wealth' },
         ];
 
         return (
             <div className="min-h-screen bg-slate-50">
-                {/* Header */}
                 <div className="bg-white border-b border-slate-200 sticky top-0 z-20" style={{paddingTop:'env(safe-area-inset-top)'}}>
                     <div className="max-w-7xl mx-auto px-6 pt-4 pb-0 flex items-start justify-between">
                         <div>
-                            <h1 className="text-lg font-bold text-slate-800 leading-tight">6 Month Challenge</h1>
-                            <p className="text-xs text-slate-400 mt-0.5">
-                                {started ? `Day ${challDay} of ${TOTAL_DAYS}` : `Starts ${CHALLENGE_START}`}
-                            </p>
+                            <h1 className="text-lg font-bold text-slate-800">6 Month Challenge</h1>
+                            <p className="text-xs text-slate-400 mt-0.5">Day {challDay} of {TOTAL_DAYS} · {new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'})}</p>
                         </div>
-                        <div className="flex items-center gap-2 mt-1">
-                            <button onClick={() => setPrivacy(p => !p)}
-                                title={privacy ? 'Show numbers' : 'Hide numbers'}
-                                className={`text-xs flex items-center gap-1 px-3 py-1.5 rounded-xl transition font-medium ${
-                                    privacy ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                                }`}>
-                                {privacy ? '👁 Show' : '🙈 Hide'}
-                            </button>
-                            <div className="text-right text-xs text-slate-400">
-                                {new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}
-                            </div>
-                        </div>
+                        <button onClick={()=>setPrivacy(p=>!p)} className={`mt-1 text-xs px-3 py-1.5 rounded-xl font-medium transition ${privacy?'bg-slate-800 text-white':'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+                            {privacy ? '👁 Show' : '🙈 Hide'}
+                        </button>
                     </div>
                     <div className="max-w-7xl mx-auto px-6 flex gap-0 overflow-x-auto">
-                        {TABS.map(t => (
-                            <button key={t.id} onClick={() => setView(t.id)}
-                                className={`px-3 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                                    view===t.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+                        {TABS.map(t=>(
+                            <button key={t.id} onClick={()=>setView(t.id)}
+                                className={`px-3 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${view===t.id?'border-blue-600 text-blue-600':'border-transparent text-slate-500 hover:text-slate-700'}`}>
                                 {t.label}
                             </button>
                         ))}
@@ -205,442 +155,306 @@
                 </div>
 
                 <div className="max-w-7xl mx-auto px-6 py-6 pb-16">
-                    {view==='dashboard' && <Dashboard data={data} today={today} challDay={challDay} privacy={privacy} />}
-                    {view==='today'     && <TodayLog  data={data} today={today} updateDay={updateDay} updateReading={updateReading} />}
-                    {view==='progress'  && <Progress  data={data} today={today} />}
-                    {view==='reading'   && <Reading   data={data} save={persist} />}
-                    {view==='wealth'    && <Wealth    data={data} save={persist} privacy={privacy} />}
-                    {view==='goals'     && <Goals     data={data} save={persist} today={today} />}
+                    {view==='home'    && <Home     data={data} today={today} challDay={challDay} privacy={privacy} goTo={setView} />}
+                    {view==='log'     && <LogToday data={data} today={today} challDay={challDay} updateDay={updateDay} updateReading={updateReading} />}
+                    {view==='isb'     && <ISBView  data={data} save={persist} today={today} />}
+                    {view==='fitness' && <FitnessView data={data} save={persist} today={today} />}
+                    {view==='reading' && <ReadingView data={data} save={persist} today={today} />}
+                    {view==='work'    && <WorkView data={data} save={persist} today={today} />}
+                    {view==='wealth'  && <WealthView data={data} save={persist} privacy={privacy} today={today} />}
                 </div>
             </div>
         );
     }
 
-    // ─── DASHBOARD ────────────────────────────────────────────────────────────
-    function Dashboard({ data, today, challDay, privacy }) {
+    // ── HOME ──────────────────────────────────────────────────────────────────
+    function Home({ data, today, challDay, privacy, goTo }) {
         const logs = data.dailyLogs;
-
-        // Weight
-        const wEntries = Object.entries(logs).filter(([_,l]) => l.weight).sort(([a],[b]) => a<b?-1:1);
-        const latestW  = wEntries.length ? wEntries[wEntries.length-1][1].weight : null;
-        const startW   = wEntries.length ? wEntries[0][1].weight : null;
-
-        // Countdown
-        const daysToJuly  = Math.max(0, daysBetween(today, '2026-07-01'));
-        const daysToHyrox = Math.max(0, daysBetween(today, HYROX_DATE));
-
-        // This week
-        const ws     = getWeekStart(today);
+        const ws   = getWeekStart(today);
         const wDates = getWeekDates(ws);
-        const wk = {
-            gym:      wDates.filter(d => logs[d]?.gym).length,
-            running:  wDates.filter(d => logs[d]?.running).length,
-            greenTea: wDates.filter(d => logs[d]?.greenTea).length,
-            outside:  wDates.filter(d => logs[d]?.outsideFood).length,
-            cheat:    wDates.filter(d => logs[d]?.cheatMeal).length,
-            study:    wDates.reduce((s,d) => s + (parseFloat(logs[d]?.studyHours)||0), 0),
-            work:     wDates.reduce((s,d) => s + (parseFloat(logs[d]?.workHours)||0), 0),
-        };
 
-        // Study days
-        const allLogDates = Object.keys(logs).filter(d => d >= CHALLENGE_START);
-        const studyDays   = allLogDates.filter(d => {
-            const h = parseFloat(logs[d]?.studyHours)||0;
-            return isWeekend(d) ? h >= 5 : h >= 3;
-        }).length;
-
-        // Reading stats
-        const curBook       = data.books.find(b => b.id === data.currentBookId);
-        const booksFinished = data.books.filter(b => b.finishedDate).length;
-        const totalPagesRead = Object.values(logs).reduce((s,l) => s+(l.pagesRead||0), 0);
-
-        // Study streak
+        // ISB
         let streak = 0;
-        const cd = new Date(parseD(today));
-        for (let i = 0; i < 100; i++) {
-            const ds = fmtDate(cd);
-            const h  = parseFloat(logs[ds]?.studyHours)||0;
-            const tgt = isWeekend(ds) ? 5 : 3;
-            if (h >= tgt) { streak++; cd.setDate(cd.getDate()-1); }
-            else break;
-        }
+        { const cd=new Date(parseD(today)); for(let i=0;i<200;i++){const ds=fmtDate(cd);const h=parseFloat(logs[ds]?.studyHours)||0;if(h>=(isWeekend(ds)?5:3)){streak++;cd.setDate(cd.getDate()-1);}else break;} }
+        const studyDays = Object.keys(logs).filter(d=>d>=CHALLENGE_START).filter(d=>{const h=parseFloat(logs[d]?.studyHours)||0;return isWeekend(d)?h>=5:h>=3;}).length;
 
-        // Net worth
-        const nwLogs = [...(data.netWorthLogs||[])].sort((a,b) => a.date<b.date?-1:1);
+        // Fitness
+        const wEntries = Object.entries(logs).filter(([_,l])=>l.weight).sort(([a],[b])=>a<b?-1:1);
+        const latestW  = wEntries.length ? wEntries[wEntries.length-1][1].weight : null;
+        const gymWk    = wDates.filter(d=>logs[d]?.gym).length;
+        const daysToJuly = Math.max(0,daysBetween(today,'2026-07-01'));
+
+        // Work
+        const workWk = wDates.reduce((s,d)=>s+(parseFloat(logs[d]?.workHours)||0),0);
+
+        // Reading
+        const curBook      = data.books.find(b=>b.id===data.currentBookId);
+        const totalPages   = Object.values(logs).reduce((s,l)=>s+(l.pagesRead||0),0);
+        const booksFinished= data.books.filter(b=>b.finishedDate).length;
+
+        // Wealth
+        const nwLogs   = [...(data.netWorthLogs||[])].sort((a,b)=>a.date<b.date?-1:1);
         const latestNW = nwLogs.length ? nwLogs[nwLogs.length-1] : null;
         const nw       = latestNW ? calcNW(latestNW) : null;
-        const nwPct    = nw !== null ? Math.min(100,(nw/NW_GOAL)*100) : 0;
 
-        const pct = Math.min(100, ((challDay / TOTAL_DAYS)*100)).toFixed(0);
+        // Today's log status
+        const tl = logs[today]||emptyDay();
+        const studyT = isWeekend(today)?5:3;
+        const todayGoals = [tl.gym, (parseFloat(tl.studyHours)||0)>=studyT, (parseFloat(tl.workHours)||0)>0, (tl.pagesRead||0)>0, tl.weight!==null].filter(Boolean).length;
+
+        const pct = Math.min(100,((challDay/TOTAL_DAYS)*100)).toFixed(0);
 
         return (
             <div className="space-y-5">
-                {/* 4 Main Goals */}
-                <div>
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Main Goals</p>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {/* ISB */}
-                        <GoalCard color="bg-blue-600">
-                            <div className="text-2xl">🎓</div>
-                            <div className="font-bold text-sm mt-1">Get into ISB</div>
-                            <div className="text-3xl font-bold mt-1">{studyDays}</div>
-                            <div className="text-xs opacity-75">study days ✓</div>
-                            <MiniBar pct={(studyDays/TOTAL_DAYS)*100} />
-                        </GoalCard>
-
-                        {/* Weight */}
-                        <GoalCard color="bg-emerald-600">
-                            <div className="text-2xl">⚖️</div>
-                            <div className="font-bold text-sm mt-1">78 kg by July</div>
-                            {latestW ? (
-                                <>
-                                    <div className="text-3xl font-bold mt-1">{latestW}<span className="text-base font-normal"> kg</span></div>
-                                    <div className="text-xs opacity-75">
-                                        {startW && latestW < startW ? `↓ ${(startW-latestW).toFixed(1)}kg lost · ` : ''}
-                                        {daysToJuly}d to go
-                                    </div>
-                                    <div className="text-xs opacity-60 mt-1">Hyrox 81-82kg · {daysToHyrox}d</div>
-                                </>
-                            ) : (
-                                <>
-                                    <div className="text-lg font-semibold mt-1 opacity-80">Log weight →</div>
-                                    <div className="text-xs opacity-60">{daysToJuly} days to July</div>
-                                </>
-                            )}
-                        </GoalCard>
-
-                        {/* Reading */}
-                        <GoalCard color="bg-amber-500">
-                            <div className="text-2xl">📚</div>
-                            <div className="font-bold text-sm mt-1">Reading Habit</div>
-                            {curBook ? (
-                                <>
-                                    <div className="font-semibold text-sm mt-1 leading-tight truncate">{curBook.title}</div>
-                                    <div className="text-xs opacity-75">p.{curBook.currentPage}/{curBook.totalPages}</div>
-                                    <MiniBar pct={(curBook.currentPage/curBook.totalPages)*100} />
-                                </>
-                            ) : (
-                                <>
-                                    <div className="text-3xl font-bold mt-1">{booksFinished}</div>
-                                    <div className="text-xs opacity-75">books · {totalPagesRead} pages</div>
-                                </>
-                            )}
-                        </GoalCard>
-
-                        {/* Work */}
-                        <GoalCard color="bg-violet-600">
-                            <div className="text-2xl">💼</div>
-                            <div className="font-bold text-sm mt-1">Work First</div>
-                            <div className="text-3xl font-bold mt-1">{wk.work.toFixed(1)}<span className="text-base font-normal">h</span></div>
-                            <div className="text-xs opacity-75">focused this week</div>
-                            <div className="text-xs opacity-60 mt-1">≈ {(wk.work/7).toFixed(1)}h/day avg</div>
-                        </GoalCard>
-                    </div>
-                </div>
-
-                {/* Net Worth summary (shown if at least one entry exists) */}
-                {nw !== null && (
-                    <div className="bg-white rounded-2xl p-5 border border-slate-100">
-                        <div className="flex justify-between items-end mb-3">
-                            <div>
-                                <p className="font-semibold text-slate-800">💰 Net Worth</p>
-                                <p className="text-xs text-slate-400">Goal: ₹6L by Aug 2026 · Last: {latestNW.date}</p>
-                            </div>
-                            <div className="text-right">
-                                <span className="text-2xl font-bold text-green-600">{fmtMoney(nw, privacy)}</span>
-                                <p className="text-xs text-slate-400">{nwPct.toFixed(0)}% of ₹6L</p>
-                            </div>
-                        </div>
-                        <div className="bg-slate-100 rounded-full h-3">
-                            <div className="bg-green-500 rounded-full h-3 transition-all" style={{width:`${nwPct}%`}} />
-                        </div>
-                        {!privacy && latestNW && (
-                            <div className="grid grid-cols-4 gap-2 mt-3 text-xs text-center text-slate-500">
-                                <div><div className="font-semibold text-slate-700">{fmtMoney(latestNW.demat||0, privacy)}</div><div>Demat</div></div>
-                                <div><div className="font-semibold text-slate-700">{fmtMoney(latestNW.crypto||0, privacy)}</div><div>Crypto</div></div>
-                                <div><div className="font-semibold text-slate-700">{fmtMoney(latestNW.bank||0, privacy)}</div><div>Bank</div></div>
-                                <div><div className="font-semibold text-red-500">{fmtMoney(latestNW.creditCard||0, privacy)}</div><div>CC (debt)</div></div>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Challenge progress bar */}
+                {/* Progress bar */}
                 <div className="bg-white rounded-2xl p-5 border border-slate-100">
                     <div className="flex justify-between items-end mb-3">
-                        <div>
-                            <p className="font-semibold text-slate-800">6 Month Challenge</p>
-                            <p className="text-xs text-slate-400">Feb 24 – Aug 31, 2026</p>
-                        </div>
-                        <div className="text-right">
-                            <span className="text-2xl font-bold text-blue-600">{pct}%</span>
-                            <p className="text-xs text-slate-400">Day {challDay}/{TOTAL_DAYS}</p>
-                        </div>
+                        <div><p className="font-bold text-slate-800 text-lg">6 Month Challenge</p><p className="text-xs text-slate-400">Feb 24 – Aug 31, 2026</p></div>
+                        <div className="text-right"><span className="text-3xl font-bold text-blue-600">{pct}%</span><p className="text-xs text-slate-400">Day {challDay}/{TOTAL_DAYS}</p></div>
                     </div>
-                    <div className="bg-slate-100 rounded-full h-3">
-                        <div className="bg-blue-600 rounded-full h-3 transition-all" style={{width:`${pct}%`}} />
+                    <div className="bg-slate-100 rounded-full h-3"><div className="bg-blue-600 rounded-full h-3 transition-all" style={{width:`${pct}%`}}/></div>
+                    <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-50">
+                        <p className="text-sm text-slate-500">Today logged</p>
+                        <span className={`font-bold text-sm ${todayGoals>=4?'text-emerald-600':todayGoals>=2?'text-amber-600':'text-slate-400'}`}>
+                            {todayGoals}/5 {todayGoals>=4?'✓':todayGoals===0?'→ Log now':''}
+                        </span>
                     </div>
                 </div>
 
-                {/* 2-column on desktop */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* This Week */}
-                    <div className="md:col-span-2 bg-white rounded-2xl p-5 border border-slate-100">
-                        <p className="font-semibold text-slate-800 mb-4">This Week</p>
-                        <div className="space-y-3">
-                            <HBar label="🏋️ Gym"       val={wk.gym}      max={4}  color="bg-emerald-500" />
-                            <HBar label="🏃 Running"    val={wk.running}  max={4}  color="bg-sky-500" />
-                            <HBar label="🍵 Green Tea"  val={wk.greenTea} max={5}  color="bg-teal-500" />
-                            <HBar label="📚 Study"      val={wk.study}    max={21} color="bg-blue-500"    unit="h" dec={1} />
-                            <HBar label="💼 Work"       val={wk.work}     max={40} color="bg-violet-500"  unit="h" dec={1} />
-                        </div>
-                        <div className="flex gap-4 mt-3 text-xs text-slate-400 pt-3 border-t border-slate-50">
-                            <span>🍔 Outside food: {wk.outside}d</span>
-                            <span>🎉 Cheat meals: {wk.cheat}</span>
-                        </div>
-                    </div>
+                {/* 5 Goal cards */}
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Your 5 Goals</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
 
-                    {/* Right column */}
-                    <div className="flex flex-col gap-4">
-                        {streak > 0 ? (
-                            <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5 flex items-center gap-3">
-                                <span className="text-4xl">🔥</span>
-                                <div>
-                                    <p className="font-bold text-orange-700 text-lg">{streak}</p>
-                                    <p className="text-sm font-medium text-orange-700">Day Streak</p>
-                                    <p className="text-xs text-orange-400 mt-0.5">Don't break it.</p>
-                                </div>
+                    {/* ISB */}
+                    <ClickCard color="bg-blue-600" onClick={()=>goTo('isb')}>
+                        <div className="text-2xl">🎓</div>
+                        <div className="font-bold text-sm mt-1">ISB 2026</div>
+                        <div className="text-3xl font-bold mt-1">{streak>0?streak:studyDays}</div>
+                        <div className="text-xs opacity-75">{streak>0?'day streak 🔥':'study days ✓'}</div>
+                        <MiniBar pct={(studyDays/TOTAL_DAYS)*100}/>
+                        <div className="text-xs opacity-50 mt-1">Tap for details →</div>
+                    </ClickCard>
+
+                    {/* Fitness */}
+                    <ClickCard color="bg-emerald-600" onClick={()=>goTo('fitness')}>
+                        <div className="text-2xl">⚖️</div>
+                        <div className="font-bold text-sm mt-1">78 kg by July</div>
+                        {latestW ? (<>
+                            <div className="text-3xl font-bold mt-1">{latestW}<span className="text-base font-normal"> kg</span></div>
+                            <div className="text-xs opacity-75">{daysToJuly}d to July · gym {gymWk}/4 wk</div>
+                        </>) : (<>
+                            <div className="text-lg font-semibold mt-2 opacity-80">Log weight</div>
+                            <div className="text-xs opacity-60">{daysToJuly} days to July</div>
+                        </>)}
+                        <div className="text-xs opacity-50 mt-1">Tap for details →</div>
+                    </ClickCard>
+
+                    {/* Work */}
+                    <ClickCard color="bg-violet-600" onClick={()=>goTo('work')}>
+                        <div className="text-2xl">💼</div>
+                        <div className="font-bold text-sm mt-1">Work First</div>
+                        <div className="text-3xl font-bold mt-1">{workWk.toFixed(1)}<span className="text-base font-normal">h</span></div>
+                        <div className="text-xs opacity-75">focused this week</div>
+                        <div className="text-xs opacity-50 mt-1">Tap for details →</div>
+                    </ClickCard>
+
+                    {/* Reading */}
+                    <ClickCard color="bg-amber-500" onClick={()=>goTo('reading')}>
+                        <div className="text-2xl">📖</div>
+                        <div className="font-bold text-sm mt-1">Reading</div>
+                        {curBook ? (<>
+                            <div className="font-semibold text-sm mt-1 leading-tight truncate">{curBook.title}</div>
+                            <div className="text-xs opacity-75">p.{curBook.currentPage}/{curBook.totalPages}</div>
+                            <MiniBar pct={(curBook.currentPage/curBook.totalPages)*100}/>
+                        </>) : (<>
+                            <div className="text-3xl font-bold mt-1">{totalPages}</div>
+                            <div className="text-xs opacity-75">pages · {booksFinished} books done</div>
+                        </>)}
+                        <div className="text-xs opacity-50 mt-1">Tap for details →</div>
+                    </ClickCard>
+
+                    {/* Wealth */}
+                    <ClickCard color="bg-green-600" onClick={()=>goTo('wealth')}>
+                        <div className="text-2xl">💰</div>
+                        <div className="font-bold text-sm mt-1">₹6L Net Worth</div>
+                        {nw!==null ? (<>
+                            <div className="text-2xl font-bold mt-1">{fmtMoney(nw,privacy)}</div>
+                            <div className="text-xs opacity-75">{((nw/NW_GOAL)*100).toFixed(0)}% of goal</div>
+                            <MiniBar pct={(nw/NW_GOAL)*100}/>
+                        </>) : (<>
+                            <div className="text-sm font-semibold mt-2 opacity-80">Log first entry</div>
+                            <div className="text-xs opacity-60">bimonthly tracking</div>
+                        </>)}
+                        <div className="text-xs opacity-50 mt-1">Tap for details →</div>
+                    </ClickCard>
+                </div>
+
+                {/* Streak + Quote */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {streak > 0 ? (
+                        <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5 flex items-center gap-4">
+                            <span className="text-5xl">🔥</span>
+                            <div>
+                                <p className="text-3xl font-bold text-orange-700">{streak}</p>
+                                <p className="font-semibold text-orange-700">Day Study Streak</p>
+                                <p className="text-xs text-orange-400 mt-0.5">Keep it alive — log today.</p>
                             </div>
-                        ) : (
-                            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 text-center">
-                                <p className="text-3xl mb-1">🎯</p>
-                                <p className="text-sm font-medium text-slate-600">Start your streak</p>
-                                <p className="text-xs text-slate-400 mt-0.5">Log 3h study today</p>
-                            </div>
-                        )}
-                        <div className="bg-slate-800 text-white rounded-2xl p-5 flex-1 flex flex-col justify-center">
-                            <p className="text-sm italic opacity-90 leading-relaxed">"We are what we repeatedly do. Excellence, then, is not an act but a habit."</p>
-                            <p className="text-xs opacity-40 mt-3">— Aristotle</p>
                         </div>
+                    ) : (
+                        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 flex items-center gap-4">
+                            <span className="text-5xl">🎯</span>
+                            <div>
+                                <p className="font-semibold text-blue-700">Start your streak</p>
+                                <p className="text-sm text-blue-500 mt-1">Log {isWeekend(today)?'5':'3'}h of study today to get the fire going.</p>
+                            </div>
+                        </div>
+                    )}
+                    <div className="bg-slate-800 text-white rounded-2xl p-5 flex flex-col justify-center">
+                        <p className="text-sm italic opacity-90 leading-relaxed">"We are what we repeatedly do. Excellence, then, is not an act but a habit."</p>
+                        <p className="text-xs opacity-40 mt-3">— Aristotle</p>
                     </div>
                 </div>
             </div>
         );
     }
 
-    function GoalCard({ color, children }) {
-        return <div className={`${color} text-white rounded-2xl p-4`}>{children}</div>;
-    }
-    function MiniBar({ pct }) {
+    function ClickCard({ color, onClick, children }) {
         return (
-            <div className="mt-2 bg-white/20 rounded-full h-1.5">
-                <div className="bg-white rounded-full h-1.5" style={{width:`${Math.min(100,pct)}%`}} />
-            </div>
-        );
-    }
-    function HBar({ label, val, max, color, unit='', dec=0 }) {
-        const pct  = Math.min(100,(val/max)*100);
-        const done = val >= max;
-        return (
-            <div>
-                <div className="flex justify-between text-sm mb-1">
-                    <span className="text-slate-600">{label}</span>
-                    <span className={`font-semibold ${done?'text-emerald-600':'text-slate-500'}`}>
-                        {dec ? val.toFixed(dec) : val}{unit} / {max}{unit} {done?'✓':''}
-                    </span>
-                </div>
-                <div className="bg-slate-100 rounded-full h-2">
-                    <div className={`${color} rounded-full h-2 transition-all`} style={{width:`${pct}%`}} />
-                </div>
+            <div onClick={onClick} className={`${color} text-white rounded-2xl p-4 cursor-pointer hover:opacity-90 transition-opacity active:scale-95 transition-transform`}>
+                {children}
             </div>
         );
     }
 
-    // ─── TODAY LOG ────────────────────────────────────────────────────────────
-    function TodayLog({ data, today, updateDay, updateReading }) {
-        const log = data.dailyLogs[today] || emptyDay();
-        const [studyInput, setStudyInput] = useState(log.studyHours || '');
-        const [workInput,  setWorkInput]  = useState(log.workHours  || '');
-        const [wInput,     setWInput]     = useState(log.weight     || '');
-        const [pagesInput, setPagesInput] = useState(log.pagesRead  || '');
-        const [readBookId, setReadBookId] = useState(String(log.readingBookId || ''));
-
-        const activeBooks = data.books.filter(b => !b.finishedDate);
+    // ── LOG TODAY ─────────────────────────────────────────────────────────────
+    function LogToday({ data, today, challDay, updateDay, updateReading }) {
+        const log = data.dailyLogs[today]||emptyDay();
+        const [studyInput, setStudyInput] = useState(log.studyHours||'');
+        const [workInput,  setWorkInput]  = useState(log.workHours ||'');
+        const [wInput,     setWInput]     = useState(log.weight    ||'');
+        const [pagesInput, setPagesInput] = useState(log.pagesRead ||'');
+        const [readBookId, setReadBookId] = useState(String(log.readingBookId||''));
+        const activeBooks = data.books.filter(b=>!b.finishedDate);
 
         useEffect(() => {
-            setStudyInput(log.studyHours || '');
-            setWorkInput(log.workHours   || '');
-            setWInput(log.weight         || '');
-            setPagesInput(log.pagesRead  || '');
-            setReadBookId(String(log.readingBookId || ''));
+            setStudyInput(log.studyHours||'');
+            setWorkInput(log.workHours  ||'');
+            setWInput(log.weight        ||'');
+            setPagesInput(log.pagesRead ||'');
+            setReadBookId(String(log.readingBookId||''));
         }, [today]);
 
-        // Set default book to current if none selected
         useEffect(() => {
-            if (!readBookId && data.currentBookId) {
-                setReadBookId(String(data.currentBookId));
-            }
+            if (!readBookId && data.currentBookId) setReadBookId(String(data.currentBookId));
         }, [data.currentBookId]);
 
-        const toggle = f => updateDay(today, { [f]: !log[f] });
-        const studyTarget = isWeekend(today) ? 5 : 3;
+        const toggle = f => updateDay(today, {[f]:!log[f]});
+        const studyT = isWeekend(today)?5:3;
         const studyH = parseFloat(log.studyHours)||0;
-        const workH  = parseFloat(log.workHours)||0;
+        const workH  = parseFloat(log.workHours) ||0;
 
         const saveReading = () => {
             const p = parseInt(pagesInput);
-            if (!readBookId || isNaN(p) || p <= 0) return;
+            if (!readBookId || isNaN(p) || p<=0) return;
             updateReading(today, Number(readBookId), p);
         };
 
-        const readingBook = log.readingBookId
-            ? data.books.find(b => b.id === log.readingBookId)
-            : null;
-
-        const goalsMet = [
-            log.gym, log.running, log.greenTea,
-            !log.outsideFood || log.cheatMeal,
-            studyH >= studyTarget,
-            (log.pagesRead||0) > 0
-        ].filter(Boolean).length;
-
-        const dayLabel = parseD(today).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+        const readBook = log.readingBookId ? data.books.find(b=>b.id===log.readingBookId) : null;
+        const goalsHit = [log.gym, studyH>=studyT, workH>0, (log.pagesRead||0)>0, log.weight!==null].filter(Boolean).length;
 
         return (
             <div className="space-y-4">
-                {/* Date header */}
                 <div className="text-center pb-1">
-                    <h2 className="text-2xl font-bold text-slate-800">{dayLabel}</h2>
-                    <p className="text-sm text-slate-400 mt-0.5">
-                        {isWeekend(today) ? 'Weekend — 5h study goal' : 'Weekday — 3h study goal'}
-                    </p>
+                    <h2 className="text-2xl font-bold text-slate-800">{parseD(today).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</h2>
+                    <p className="text-sm text-slate-400 mt-0.5">Day {challDay} · {isWeekend(today)?'Weekend — 5h study goal':'Weekday — 3h study goal'}</p>
                 </div>
 
-                {/* 2-column on desktop */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* LEFT: Health */}
-                    <LogSection title="🏃 Health" accent="border-l-emerald-500">
-                        <Toggle checked={log.gym}      onChange={() => toggle('gym')}      label="Gym"        sub="Strength session" />
-                        <Toggle checked={log.running}  onChange={() => toggle('running')}  label="Running"    sub="Outdoor / cardio" />
-                        <Toggle checked={log.greenTea} onChange={() => toggle('greenTea')} label="Green Tea"  sub="Had green tea today" />
-                        <div className="grid grid-cols-2 gap-2 pt-1">
-                            <Toggle checked={!log.outsideFood} onChange={() => toggle('outsideFood')} label="No outside food" sub="Home food only" />
-                            <Toggle checked={log.cheatMeal}    onChange={() => toggle('cheatMeal')}   label="Cheat meal"     sub="1 per week ok" warn />
-                        </div>
-                        {/* Weight */}
-                        <div className="pt-3 border-t border-slate-100 mt-1">
-                            <label className="text-sm font-medium text-slate-700 block mb-2">⚖️ Weight today</label>
-                            <div className="flex gap-2 items-center">
-                                <input type="number" step="0.1" min="40" max="200"
-                                    value={wInput} onChange={e => setWInput(e.target.value)}
-                                    placeholder={log.weight ? String(log.weight) : "e.g. 84.5"}
-                                    className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-emerald-500"
-                                />
-                                <span className="text-sm text-slate-400">kg</span>
-                                <button onClick={() => { const w=parseFloat(wInput); if(!isNaN(w)) updateDay(today,{weight:w}); }}
-                                    className="px-4 py-2.5 bg-emerald-600 text-white text-sm rounded-xl font-medium hover:bg-emerald-700 transition">
-                                    Save
-                                </button>
-                            </div>
-                            {log.weight && <p className="text-xs text-emerald-600 mt-1.5">✓ {log.weight} kg logged</p>}
-                        </div>
-                    </LogSection>
-
-                    {/* RIGHT: Studies + Work + Reading + Score */}
+                    {/* LEFT col */}
                     <div className="space-y-4">
-                        <LogSection title="📚 Studies — ISB Prep" accent="border-l-blue-500">
-                            <div>
-                                <div className="flex justify-between items-center mb-2">
-                                    <label className="text-sm font-medium text-slate-700">Hours studied today</label>
-                                    <span className="text-xs text-slate-400">Goal: {studyTarget}h</span>
-                                </div>
-                                <div className="flex gap-2 items-center">
-                                    <input type="number" step="0.5" min="0" max="16"
-                                        value={studyInput} onChange={e => setStudyInput(e.target.value)}
-                                        placeholder="0"
-                                        className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500"
-                                    />
-                                    <span className="text-sm text-slate-400">hrs</span>
-                                    <button onClick={() => { const h=parseFloat(studyInput); if(!isNaN(h)) updateDay(today,{studyHours:h}); }}
-                                        className="px-4 py-2.5 bg-blue-600 text-white text-sm rounded-xl font-medium hover:bg-blue-700 transition">
-                                        Save
-                                    </button>
-                                </div>
-                                {studyH > 0 && (
-                                    <p className={`text-xs mt-1.5 ${studyH>=studyTarget ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                        {studyH>=studyTarget ? `✓ Goal met! ${studyH}h logged` : `${studyH}h logged — ${(studyTarget-studyH).toFixed(1)}h to go`}
-                                    </p>
-                                )}
+                        {/* Health habits */}
+                        <Section title="🏃 Health Habits" accent="border-l-emerald-500">
+                            <Toggle checked={log.gym}      onChange={()=>toggle('gym')}      label="Gym"         sub="Strength session" />
+                            <Toggle checked={log.running}  onChange={()=>toggle('running')}  label="Running"     sub="Outdoor / cardio" />
+                            <Toggle checked={log.greenTea} onChange={()=>toggle('greenTea')} label="Green Tea"   sub="Had green tea today" />
+                            <div className="grid grid-cols-2 gap-2 pt-1">
+                                <Toggle checked={!log.outsideFood} onChange={()=>toggle('outsideFood')} label="No outside food" sub="Home food only" />
+                                <Toggle checked={log.cheatMeal}    onChange={()=>toggle('cheatMeal')}   label="Cheat meal"     sub="1 per week ok" warn />
                             </div>
-                            <p className="text-xs text-slate-400">GMAT prep / case studies / essays / profile building</p>
-                        </LogSection>
+                        </Section>
 
-                        <LogSection title="💼 Focused Work" accent="border-l-violet-500">
-                            <div>
-                                <label className="text-sm font-medium text-slate-700 block mb-2">Hours of deep work today</label>
-                                <div className="flex gap-2 items-center">
-                                    <input type="number" step="0.5" min="0" max="16"
-                                        value={workInput} onChange={e => setWorkInput(e.target.value)}
-                                        placeholder="0"
-                                        className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-violet-500"
-                                    />
-                                    <span className="text-sm text-slate-400">hrs</span>
-                                    <button onClick={() => { const h=parseFloat(workInput); if(!isNaN(h)) updateDay(today,{workHours:h}); }}
-                                        className="px-4 py-2.5 bg-violet-600 text-white text-sm rounded-xl font-medium hover:bg-violet-700 transition">
-                                        Save
-                                    </button>
-                                </div>
-                                {workH > 0 && <p className="text-xs text-violet-600 mt-1.5">✓ {workH}h focused work logged</p>}
+                        {/* Weight */}
+                        <Section title="⚖️ Weight" accent="border-l-emerald-500">
+                            <div className="flex gap-2 items-center">
+                                <input type="number" step="0.1" min="40" max="200" value={wInput} onChange={e=>setWInput(e.target.value)}
+                                    placeholder={log.weight?String(log.weight):'e.g. 84.5'}
+                                    className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-emerald-500"/>
+                                <span className="text-sm text-slate-400">kg</span>
+                                <button onClick={()=>{const w=parseFloat(wInput);if(!isNaN(w))updateDay(today,{weight:w});}}
+                                    className="px-4 py-2.5 bg-emerald-600 text-white text-sm rounded-xl font-medium hover:bg-emerald-700 transition">Save</button>
                             </div>
-                            <p className="text-xs text-slate-400">No distractions — phone away, full focus sessions only</p>
-                        </LogSection>
+                            {log.weight && <p className="text-xs text-emerald-600 mt-1">✓ {log.weight} kg logged</p>}
+                        </Section>
+                    </div>
 
-                        {/* Reading today */}
-                        <LogSection title="📖 Reading Today" accent="border-l-amber-500">
-                            {activeBooks.length > 0 ? (
+                    {/* RIGHT col */}
+                    <div className="space-y-4">
+                        {/* Study */}
+                        <Section title="🎓 Study — ISB Prep" accent="border-l-blue-500">
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-sm font-medium text-slate-700">Hours studied today</span>
+                                <span className="text-xs text-slate-400">Goal: {studyT}h</span>
+                            </div>
+                            <div className="flex gap-2 items-center">
+                                <input type="number" step="0.5" min="0" max="16" value={studyInput} onChange={e=>setStudyInput(e.target.value)}
+                                    placeholder="0"
+                                    className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500"/>
+                                <span className="text-sm text-slate-400">hrs</span>
+                                <button onClick={()=>{const h=parseFloat(studyInput);if(!isNaN(h))updateDay(today,{studyHours:h});}}
+                                    className="px-4 py-2.5 bg-blue-600 text-white text-sm rounded-xl font-medium hover:bg-blue-700 transition">Save</button>
+                            </div>
+                            {studyH>0 && <p className={`text-xs mt-1 ${studyH>=studyT?'text-emerald-600':'text-amber-600'}`}>{studyH>=studyT?`✓ Goal met! ${studyH}h`:`${studyH}h — ${(studyT-studyH).toFixed(1)}h to go`}</p>}
+                        </Section>
+
+                        {/* Work */}
+                        <Section title="💼 Focused Work" accent="border-l-violet-500">
+                            <div className="flex gap-2 items-center">
+                                <input type="number" step="0.5" min="0" max="16" value={workInput} onChange={e=>setWorkInput(e.target.value)}
+                                    placeholder="0"
+                                    className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-violet-500"/>
+                                <span className="text-sm text-slate-400">hrs</span>
+                                <button onClick={()=>{const h=parseFloat(workInput);if(!isNaN(h))updateDay(today,{workHours:h});}}
+                                    className="px-4 py-2.5 bg-violet-600 text-white text-sm rounded-xl font-medium hover:bg-violet-700 transition">Save</button>
+                            </div>
+                            {workH>0 && <p className="text-xs text-violet-600 mt-1">✓ {workH}h focused work logged</p>}
+                        </Section>
+
+                        {/* Reading */}
+                        <Section title="📖 Reading" accent="border-l-amber-500">
+                            {activeBooks.length>0 ? (
                                 <div className="space-y-2">
-                                    <select value={readBookId} onChange={e => setReadBookId(e.target.value)}
+                                    <select value={readBookId} onChange={e=>setReadBookId(e.target.value)}
                                         className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500 bg-white">
                                         <option value="">Select book…</option>
-                                        {activeBooks.map(b => (
-                                            <option key={b.id} value={b.id}>{b.title}</option>
-                                        ))}
+                                        {activeBooks.map(b=><option key={b.id} value={b.id}>{b.title}</option>)}
                                     </select>
                                     <div className="flex gap-2 items-center">
-                                        <input type="number" min="0" max="500"
-                                            value={pagesInput} onChange={e => setPagesInput(e.target.value)}
-                                            onKeyDown={e => e.key==='Enter' && saveReading()}
-                                            placeholder="Pages read today"
-                                            className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500"
-                                        />
+                                        <input type="number" min="0" max="500" value={pagesInput} onChange={e=>setPagesInput(e.target.value)}
+                                            onKeyDown={e=>e.key==='Enter'&&saveReading()} placeholder="Pages today"
+                                            className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500"/>
                                         <span className="text-sm text-slate-400">pages</span>
-                                        <button onClick={saveReading}
-                                            className="px-4 py-2.5 bg-amber-500 text-white text-sm rounded-xl font-medium hover:bg-amber-600 transition">
-                                            Save
-                                        </button>
+                                        <button onClick={saveReading} className="px-4 py-2.5 bg-amber-500 text-white text-sm rounded-xl font-medium hover:bg-amber-600 transition">Save</button>
                                     </div>
-                                    {log.pagesRead > 0 && (
-                                        <p className="text-xs text-amber-600">
-                                            ✓ {log.pagesRead} pages logged{readingBook ? ` — ${readingBook.title}` : ''}
-                                        </p>
-                                    )}
+                                    {log.pagesRead>0 && <p className="text-xs text-amber-600">✓ {log.pagesRead} pages{readBook?` — ${readBook.title}`:''}</p>}
                                 </div>
-                            ) : (
-                                <p className="text-sm text-slate-400">No active books — add one in the Reading tab.</p>
-                            )}
-                            <p className="text-xs text-slate-400 pt-1">Build the habit — even 10 pages counts.</p>
-                        </LogSection>
+                            ) : <p className="text-sm text-slate-400">Add a book in the Reading tab first.</p>}
+                        </Section>
 
                         {/* Day score */}
-                        <div className={`rounded-2xl p-5 text-center border ${goalsMet >= 5 ? 'bg-emerald-50 border-emerald-200' : goalsMet >= 3 ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
-                            <div className="text-4xl mb-2">{goalsMet >= 6 ? '🔥' : goalsMet >= 4 ? '💪' : '⏳'}</div>
-                            <p className={`text-xl font-bold ${goalsMet>=5?'text-emerald-700':goalsMet>=3?'text-amber-700':'text-slate-500'}`}>
-                                {goalsMet}/6
-                            </p>
-                            <p className="text-sm text-slate-500 mt-0.5">goals hit today</p>
-                            <p className="text-xs text-slate-400 mt-1">
-                                {goalsMet===6 ? 'Perfect day. Absolutely elite.' : goalsMet>=4 ? 'Solid effort. Push further.' : 'Every bit counts. Keep moving.'}
-                            </p>
+                        <div className={`rounded-2xl p-5 text-center border ${goalsHit>=4?'bg-emerald-50 border-emerald-200':goalsHit>=2?'bg-amber-50 border-amber-200':'bg-slate-50 border-slate-200'}`}>
+                            <div className="text-4xl mb-1">{goalsHit===5?'🔥':goalsHit>=3?'💪':'⏳'}</div>
+                            <p className={`text-2xl font-bold ${goalsHit>=4?'text-emerald-700':goalsHit>=2?'text-amber-700':'text-slate-500'}`}>{goalsHit}<span className="text-base font-normal text-slate-400">/5</span></p>
+                            <p className="text-xs text-slate-400 mt-1">{goalsHit===5?'Perfect day. Absolutely elite.':goalsHit>=3?'Solid. Push one more.':'Every bit counts. Keep moving.'}</p>
                         </div>
                     </div>
                 </div>
@@ -648,279 +462,248 @@
         );
     }
 
-    function LogSection({ title, accent, children }) {
-        return (
-            <div className={`bg-white rounded-2xl p-5 border border-slate-100 border-l-4 ${accent}`}>
-                <h3 className="font-semibold text-slate-800 mb-3">{title}</h3>
-                <div className="space-y-2">{children}</div>
-            </div>
-        );
-    }
-
-    function Toggle({ checked, onChange, label, sub, warn }) {
-        return (
-            <div className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer select-none transition-colors ${
-                checked ? (warn ? 'bg-orange-50' : 'bg-emerald-50') : 'bg-slate-50 hover:bg-slate-100'
-            }`} onClick={onChange}>
-                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                    checked ? (warn ? 'bg-orange-400 border-orange-400' : 'bg-emerald-500 border-emerald-500') : 'border-slate-300'
-                }`}>
-                    {checked && <span className="text-white text-xs font-bold">✓</span>}
-                </div>
-                <div>
-                    <p className={`text-sm font-medium leading-tight ${checked ? (warn?'text-orange-700':'text-emerald-700') : 'text-slate-700'}`}>{label}</p>
-                    {sub && <p className="text-xs text-slate-400">{sub}</p>}
-                </div>
-            </div>
-        );
-    }
-
-    // ─── PROGRESS ─────────────────────────────────────────────────────────────
-    function Progress({ data, today }) {
+    // ── ISB VIEW ─────────────────────────────────────────────────────────────
+    function ISBView({ data, save, today }) {
         const logs = data.dailyLogs;
+        const ws   = getWeekStart(today);
+        const wDates = getWeekDates(ws);
 
-        const wEntries = Object.entries(logs).filter(([_,l]) => l.weight).sort(([a],[b]) => a<b?-1:1);
+        let streak = 0;
+        { const cd=new Date(parseD(today)); for(let i=0;i<200;i++){const ds=fmtDate(cd);const h=parseFloat(logs[ds]?.studyHours)||0;if(h>=(isWeekend(ds)?5:3)){streak++;cd.setDate(cd.getDate()-1);}else break;} }
 
-        const last14 = Array.from({length:14}, (_,i) => {
-            const d = parseD(today); d.setDate(d.getDate()-13+i);
-            const ds = fmtDate(d);
-            const l  = logs[ds] || {};
-            return { ds, label: d.toLocaleDateString('en-US',{weekday:'short', day:'numeric'}),
-                gym: l.gym||false, running: l.running||false, greenTea: l.greenTea||false,
-                study: parseFloat(l.studyHours)||0, work: parseFloat(l.workHours)||0,
-                weight: l.weight||null, outside: l.outsideFood||false,
-                pages: l.pagesRead||0 };
-        });
-
-        const months = [
-            {key:'2026-02',label:'Feb (start)'},{key:'2026-03',label:'March'},{key:'2026-04',label:'April'},
-            {key:'2026-05',label:'May'},{key:'2026-06',label:'June'},{key:'2026-07',label:'July'},{key:'2026-08',label:'August'}
-        ];
-        const mStats = k => {
-            const ents = Object.entries(logs).filter(([d]) => d.startsWith(k));
-            return {
-                days:  ents.length,
-                gym:   ents.filter(([_,l])=>l.gym).length,
-                run:   ents.filter(([_,l])=>l.running).length,
-                tea:   ents.filter(([_,l])=>l.greenTea).length,
-                study: ents.reduce((s,[_,l])=>s+(parseFloat(l.studyHours)||0),0),
-                work:  ents.reduce((s,[_,l])=>s+(parseFloat(l.workHours)||0),0),
-                pages: ents.reduce((s,[_,l])=>s+(l.pagesRead||0),0),
-            };
-        };
+        const hoursWk  = wDates.reduce((s,d)=>s+(parseFloat(logs[d]?.studyHours)||0),0);
+        const elapsed  = Math.max(1, daysBetween(CHALLENGE_START,today)+1);
+        const targetDs = Object.keys(logs).filter(d=>d>=CHALLENGE_START&&d<=today).filter(d=>{const h=parseFloat(logs[d]?.studyHours)||0;return isWeekend(d)?h>=5:h>=3;}).length;
+        const hoursMth = Object.entries(logs).filter(([d])=>d.startsWith(today.substring(0,7))).reduce((s,[_,l])=>s+(parseFloat(l.studyHours)||0),0);
 
         return (
             <div className="space-y-5">
-                {/* Weight chart */}
-                <div className="bg-white rounded-2xl p-5 border border-slate-100">
-                    <div className="flex justify-between items-center mb-1">
-                        <p className="font-semibold text-slate-800">⚖️ Weight Progress</p>
-                        {wEntries.length > 0 && <span className="text-xs text-slate-400">{wEntries.length} entries</span>}
-                    </div>
-                    <div className="flex gap-4 text-xs mb-4">
-                        <span className="text-amber-600 font-medium">─ 78kg target (July)</span>
-                        <span className="text-violet-500 font-medium">─ 81kg (Hyrox)</span>
-                    </div>
-                    {wEntries.length < 2 ? (
-                        <div className="py-10 text-center text-slate-400 text-sm">
-                            Log your weight daily to see your progress chart here.
-                        </div>
-                    ) : (
-                        <WeightChart entries={wEntries} />
-                    )}
+                <div>
+                    <h2 className="text-xl font-bold text-slate-800">🎓 ISB Preparation</h2>
+                    <p className="text-sm text-slate-400 mt-0.5">GMAT · Essays · Applications · 2026</p>
                 </div>
 
-                {/* 14-day grid */}
-                <div className="bg-white rounded-2xl p-5 border border-slate-100">
-                    <p className="font-semibold text-slate-800 mb-4">Last 14 Days</p>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-xs">
-                            <thead>
-                                <tr className="text-slate-400 border-b border-slate-100">
-                                    <th className="text-left pb-2 pr-2">Date</th>
-                                    <th className="pb-2 px-1">💪</th>
-                                    <th className="pb-2 px-1">🏃</th>
-                                    <th className="pb-2 px-1">🍵</th>
-                                    <th className="pb-2 px-1">🍔</th>
-                                    <th className="pb-2 px-1">📚h</th>
-                                    <th className="pb-2 px-1">💼h</th>
-                                    <th className="pb-2 px-1">📖</th>
-                                    <th className="pb-2 px-1">⚖️</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {last14.map(d => (
-                                    <tr key={d.ds} className={`border-t border-slate-50 ${d.ds===today?'font-bold bg-blue-50':''}`}>
-                                        <td className="py-1.5 pr-2 text-slate-600 whitespace-nowrap">{d.label}</td>
-                                        <td className="py-1.5 px-1 text-center">{d.gym?'✅':'·'}</td>
-                                        <td className="py-1.5 px-1 text-center">{d.running?'✅':'·'}</td>
-                                        <td className="py-1.5 px-1 text-center">{d.greenTea?'✅':'·'}</td>
-                                        <td className="py-1.5 px-1 text-center">{d.outside?'❌':'·'}</td>
-                                        <td className={`py-1.5 px-1 text-center ${d.study>0?'text-blue-600':''}`}>{d.study||'·'}</td>
-                                        <td className={`py-1.5 px-1 text-center ${d.work>0?'text-violet-600':''}`}>{d.work||'·'}</td>
-                                        <td className={`py-1.5 px-1 text-center ${d.pages>0?'text-amber-600':''}`}>{d.pages||'·'}</td>
-                                        <td className={`py-1.5 px-1 text-center ${d.weight?'text-emerald-600':''}`}>{d.weight||'·'}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                <div className="grid grid-cols-3 gap-3">
+                    <StatTile big={streak} sub="day streak" icon="🔥" bright={streak>0} />
+                    <StatTile big={`${targetDs}/${elapsed}`} sub="days on target" icon="📅" />
+                    <StatTile big={`${hoursMth.toFixed(0)}h`} sub="this month" icon="📚" />
                 </div>
 
-                {/* Monthly */}
+                {/* 7-day chart */}
                 <div className="bg-white rounded-2xl p-5 border border-slate-100">
-                    <p className="font-semibold text-slate-800 mb-4">Monthly Breakdown</p>
-                    <div className="space-y-3">
-                        {months.map(m => {
-                            const s   = mStats(m.key);
-                            const cur  = today.startsWith(m.key);
-                            const past = m.key < today.substring(0,7);
+                    <div className="flex justify-between items-center mb-4">
+                        <p className="font-semibold text-slate-800">This Week</p>
+                        <span className={`text-sm font-semibold ${hoursWk>=21?'text-emerald-600':'text-slate-500'}`}>{hoursWk.toFixed(1)}h / 25h goal</span>
+                    </div>
+                    <div className="flex gap-2 items-end" style={{height:'90px'}}>
+                        {wDates.map(d=>{
+                            const h    = parseFloat(logs[d]?.studyHours)||0;
+                            const goal = isWeekend(d)?5:3;
+                            const max  = isWeekend(d)?5:3;
+                            const pct  = Math.min(100,(h/max)*100);
+                            const met  = h>=goal;
+                            const isT  = d===today;
                             return (
-                                <div key={m.key} className={`p-3 rounded-xl transition ${cur?'bg-blue-50 border border-blue-200':past?'bg-slate-50':' bg-slate-50 opacity-40'}`}>
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className={`text-sm font-semibold ${cur?'text-blue-700':'text-slate-700'}`}>
-                                            {m.label}{cur?' ← now':''}
-                                        </span>
-                                        <span className="text-xs text-slate-400">{s.days} days logged</span>
+                                <div key={d} className="flex-1 flex flex-col items-center gap-1">
+                                    <div className="w-full bg-slate-100 rounded-t relative" style={{height:'64px'}}>
+                                        <div className={`absolute bottom-0 w-full rounded-t transition-all ${met?'bg-blue-500':h>0?'bg-blue-300':''}`} style={{height:`${pct}%`}}/>
                                     </div>
-                                    {s.days > 0 && (
-                                        <div className="grid grid-cols-6 gap-1 text-center text-xs">
-                                            <Stat v={s.gym}   label="gym"   c="text-emerald-600" />
-                                            <Stat v={s.run}   label="runs"  c="text-sky-600" />
-                                            <Stat v={s.tea}   label="🍵"    c="text-teal-600" />
-                                            <Stat v={`${s.study.toFixed(0)}h`} label="study" c="text-blue-600" />
-                                            <Stat v={`${s.work.toFixed(0)}h`}  label="work"  c="text-violet-600" />
-                                            <Stat v={`${s.pages}p`}           label="read"  c="text-amber-600" />
-                                        </div>
-                                    )}
+                                    <span className={`text-xs ${isT?'font-bold text-blue-600':'text-slate-400'}`}>{parseD(d).toLocaleDateString('en-US',{weekday:'narrow'})}</span>
+                                    {h>0&&<span className={`text-xs font-semibold ${met?'text-blue-600':'text-amber-500'}`}>{h}h</span>}
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <div className="bg-slate-100 rounded-full h-2 mt-3">
+                        <div className={`${hoursWk>=21?'bg-blue-600':'bg-blue-400'} rounded-full h-2`} style={{width:`${Math.min(100,(hoursWk/25)*100)}%`}}/>
+                    </div>
+                </div>
+
+                {/* Monthly hours */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-100">
+                    <p className="font-semibold text-slate-800 mb-4">Monthly Hours</p>
+                    <div className="space-y-2.5">
+                        {MONTHS.map(m=>{
+                            const h    = Object.entries(logs).filter(([d])=>d.startsWith(m.key)).reduce((s,[_,l])=>s+(parseFloat(l.studyHours)||0),0);
+                            const isCur= today.startsWith(m.key);
+                            const fut  = m.key > today.substring(0,7);
+                            return (
+                                <div key={m.key} className={fut?'opacity-30':''}>
+                                    <div className="flex justify-between text-xs mb-1">
+                                        <span className={isCur?'font-semibold text-blue-700':'text-slate-600'}>{m.label}{isCur?' ← now':''}</span>
+                                        <span className={h>0?'text-blue-600 font-semibold':'text-slate-300'}>{h.toFixed(0)}h</span>
+                                    </div>
+                                    <div className="bg-slate-100 rounded-full h-2">
+                                        <div className="bg-blue-500 rounded-full h-2 transition-all" style={{width:`${Math.min(100,(h/100)*100)}%`}}/>
+                                    </div>
                                 </div>
                             );
                         })}
                     </div>
                 </div>
+
+                <MonthlyNotes data={data} save={save} noteKey="studies" title="Monthly ISB Notes" today={today} color="focus:border-blue-400" />
             </div>
         );
     }
 
-    function Stat({ v, label, c }) {
-        return <div><div className={`font-bold ${c}`}>{v}</div><div className="text-slate-400">{label}</div></div>;
-    }
+    // ── FITNESS VIEW ──────────────────────────────────────────────────────────
+    function FitnessView({ data, save, today }) {
+        const logs = data.dailyLogs;
+        const ws   = getWeekStart(today);
+        const wDates = getWeekDates(ws);
 
-    function WeightChart({ entries }) {
-        const ref = useRef(null);
-        const ch  = useRef(null);
-        useEffect(() => {
-            if (!ref.current) return;
-            if (ch.current) ch.current.destroy();
-            const labels  = entries.map(([d]) => parseD(d).toLocaleDateString('en-US',{month:'short',day:'numeric'}));
-            const weights = entries.map(([_,l]) => l.weight);
-            const mn = Math.max(60, Math.min(...weights)-3);
-            ch.current = new Chart(ref.current, {
-                type:'line',
-                data:{ labels, datasets:[
-                    { label:'Weight', data:weights, borderColor:'#10b981', backgroundColor:'rgba(16,185,129,0.07)',
-                      tension:0.4, fill:true, pointRadius:3, pointBackgroundColor:'#10b981' },
-                    { label:'78kg target', data:Array(labels.length).fill(78), borderColor:'#f59e0b',
-                      borderDash:[6,3], pointRadius:0, fill:false },
-                    { label:'81kg (Hyrox)', data:Array(labels.length).fill(81), borderColor:'#8b5cf6',
-                      borderDash:[4,4], pointRadius:0, fill:false },
-                ]},
-                options:{ responsive:true,
-                    plugins:{ legend:{display:false}, tooltip:{mode:'index'} },
-                    scales:{
-                        y:{ min:mn, grid:{color:'#f1f5f9'}, ticks:{callback:v=>`${v}kg`} },
-                        x:{ grid:{display:false}, ticks:{maxRotation:0, maxTicksLimit:8} }
-                    }
-                }
-            });
-            return () => ch.current?.destroy();
-        }, [entries]);
-        return <canvas ref={ref} height="180" />;
-    }
+        const wEntries = Object.entries(logs).filter(([_,l])=>l.weight).sort(([a],[b])=>a<b?-1:1);
+        const latestW  = wEntries.length ? wEntries[wEntries.length-1][1].weight : null;
+        const startW   = wEntries.length ? wEntries[0][1].weight : null;
+        const daysToJuly  = Math.max(0,daysBetween(today,'2026-07-01'));
+        const daysToHyrox = Math.max(0,daysBetween(today,HYROX_DATE));
 
-    // ─── READING ──────────────────────────────────────────────────────────────
-    function Reading({ data, save }) {
-        const [showAdd, setShowAdd]   = useState(false);
-        const [title, setTitle]       = useState('');
-        const [pages, setPages]       = useState('');
-        const [pageInputs, setPageInputs] = useState({});
+        const gymWk  = wDates.filter(d=>logs[d]?.gym).length;
+        const runWk  = wDates.filter(d=>logs[d]?.running).length;
+        const teaWk  = wDates.filter(d=>logs[d]?.greenTea).length;
+        const outsWk = wDates.filter(d=>logs[d]?.outsideFood).length;
 
-        const addBook = () => {
-            if (!title.trim() || !pages) return;
-            const book = { id:Date.now(), title:title.trim(), totalPages:parseInt(pages),
-                currentPage:0, startDate:fmtDate(new Date()), finishedDate:null };
-            save({ ...data, books:[...data.books, book], currentBookId:book.id });
-            setTitle(''); setPages(''); setShowAdd(false);
-        };
-
-        const updatePage = (bookId) => {
-            const p = parseInt(pageInputs[bookId]);
-            if (isNaN(p) || p < 0) return;
-            const book = data.books.find(b => b.id===bookId);
-            const newPage = Math.min(p, book.totalPages);
-            const done = newPage >= book.totalPages;
-            save({ ...data,
-                books: data.books.map(b => b.id===bookId
-                    ? { ...b, currentPage:newPage, finishedDate: done&&!b.finishedDate ? fmtDate(new Date()) : b.finishedDate }
-                    : b),
-                currentBookId: done && data.currentBookId===bookId ? null : data.currentBookId
-            });
-            setPageInputs(p => ({...p, [bookId]:''}));
-        };
-
-        const active   = data.books.filter(b => !b.finishedDate);
-        const finished = data.books.filter(b =>  b.finishedDate);
-
-        // Reading history from daily logs
-        const readingHistory = Object.entries(data.dailyLogs)
-            .filter(([_, l]) => (l.pagesRead||0) > 0)
-            .sort(([a],[b]) => b < a ? -1 : 1) // most recent first
-            .slice(0, 20);
-
-        const totalPagesRead = Object.values(data.dailyLogs).reduce((s,l) => s+(l.pagesRead||0), 0);
-        const readingDays    = Object.values(data.dailyLogs).filter(l => (l.pagesRead||0) > 0).length;
-        const avgPages       = readingDays > 0 ? (totalPagesRead / readingDays).toFixed(0) : 0;
+        // Last 30 days calendar
+        const last30 = Array.from({length:30},(_,i)=>{
+            const d=parseD(today); d.setDate(d.getDate()-29+i);
+            const ds=fmtDate(d);
+            return {ds,day:d.getDate(),gym:logs[ds]?.gym||false,run:logs[ds]?.running||false};
+        });
 
         return (
-            <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-bold text-slate-800">📖 Reading Tracker</h2>
-                    <button onClick={() => setShowAdd(!showAdd)}
-                        className="px-4 py-2 bg-amber-500 text-white text-sm rounded-xl font-medium hover:bg-amber-600 transition">
-                        + Add Book
-                    </button>
+            <div className="space-y-5">
+                <div>
+                    <h2 className="text-xl font-bold text-slate-800">🏋️ Fitness</h2>
+                    <p className="text-sm text-slate-400 mt-0.5">78 kg by July · 81-82 kg for Hyrox Nov 2026</p>
                 </div>
 
-                {/* Reading stats summary */}
-                {totalPagesRead > 0 && (
-                    <div className="grid grid-cols-3 gap-3">
-                        <div className="bg-amber-50 rounded-2xl p-4 text-center border border-amber-100">
-                            <div className="text-2xl font-bold text-amber-700">{totalPagesRead}</div>
-                            <div className="text-xs text-amber-600 mt-0.5">total pages</div>
+                {/* Weight hero */}
+                <div className="bg-gradient-to-br from-emerald-600 to-green-700 text-white rounded-2xl p-6">
+                    {latestW ? (<>
+                        <p className="text-sm opacity-75">Current weight</p>
+                        <p className="text-5xl font-bold">{latestW} kg</p>
+                        <div className="grid grid-cols-2 gap-4 mt-4">
+                            <div><p className="text-sm opacity-75">→ 78 kg target</p><p className="font-semibold">{latestW>78?`${(latestW-78).toFixed(1)} kg to lose`:'✓ At target'} · {daysToJuly}d</p></div>
+                            <div><p className="text-sm opacity-75">→ Hyrox 81-82 kg</p><p className="font-semibold">{daysToHyrox}d to Nov 2026</p></div>
                         </div>
-                        <div className="bg-amber-50 rounded-2xl p-4 text-center border border-amber-100">
-                            <div className="text-2xl font-bold text-amber-700">{readingDays}</div>
-                            <div className="text-xs text-amber-600 mt-0.5">days read</div>
-                        </div>
-                        <div className="bg-amber-50 rounded-2xl p-4 text-center border border-amber-100">
-                            <div className="text-2xl font-bold text-amber-700">{avgPages}</div>
-                            <div className="text-xs text-amber-600 mt-0.5">avg pages/day</div>
-                        </div>
-                    </div>
-                )}
+                        {startW && latestW<startW && <p className="text-sm opacity-75 mt-2">↓ {(startW-latestW).toFixed(1)} kg lost since start</p>}
+                    </>) : (<>
+                        <p className="text-sm opacity-75">No weight logged yet</p>
+                        <p className="text-2xl font-bold mt-1">Log your weight daily →</p>
+                        <p className="text-sm opacity-60 mt-2">Go to Log tab to log today's weight</p>
+                    </>)}
+                </div>
 
+                {/* This week habits */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-100">
+                    <p className="font-semibold text-slate-800 mb-4">This Week</p>
+                    <div className="space-y-3">
+                        <HBar label="🏋️ Gym"       val={gymWk}  max={4} color="bg-emerald-500" />
+                        <HBar label="🏃 Running"    val={runWk}  max={4} color="bg-sky-500" />
+                        <HBar label="🍵 Green Tea"  val={teaWk}  max={5} color="bg-teal-500" />
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-slate-50 text-xs text-slate-400 flex gap-4">
+                        <span>🍔 Outside food: {outsWk} day{outsWk!==1?'s':''}</span>
+                        <span>🎉 Cheat meals: {wDates.filter(d=>logs[d]?.cheatMeal).length}</span>
+                    </div>
+                </div>
+
+                {/* Weight chart */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-100">
+                    <div className="flex justify-between items-center mb-1">
+                        <p className="font-semibold text-slate-800">Weight Progress</p>
+                        {wEntries.length>0&&<span className="text-xs text-slate-400">{wEntries.length} entries</span>}
+                    </div>
+                    <div className="flex gap-4 text-xs mb-4">
+                        <span className="text-amber-600 font-medium">─ 78kg (July)</span>
+                        <span className="text-violet-500 font-medium">─ 81kg (Hyrox)</span>
+                    </div>
+                    {wEntries.length<2 ? (
+                        <div className="py-8 text-center text-slate-400 text-sm">Log weight daily to see your chart here.</div>
+                    ) : <WeightChart entries={wEntries}/>}
+                </div>
+
+                {/* 30-day gym/run calendar */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-100">
+                    <p className="font-semibold text-slate-800 mb-1">Last 30 Days</p>
+                    <div className="flex gap-4 text-xs mb-3">
+                        <span><span className="inline-block w-3 h-3 rounded-full bg-emerald-500 mr-1"/>Gym+Run</span>
+                        <span><span className="inline-block w-3 h-3 rounded-full bg-blue-500 mr-1"/>Gym</span>
+                        <span><span className="inline-block w-3 h-3 rounded-full bg-sky-400 mr-1"/>Run</span>
+                    </div>
+                    <div className="grid grid-cols-10 gap-1.5">
+                        {last30.map(d=>(
+                            <div key={d.ds} className="flex flex-col items-center gap-0.5">
+                                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ${d.gym&&d.run?'bg-emerald-500 text-white':d.gym?'bg-blue-500 text-white':d.run?'bg-sky-400 text-white':'bg-slate-100 text-slate-400'}`}>
+                                    {d.day}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <MonthlyNotes data={data} save={save} noteKey="health" title="Monthly Fitness Notes" today={today} color="focus:border-emerald-400" />
+            </div>
+        );
+    }
+
+    // ── READING VIEW ──────────────────────────────────────────────────────────
+    function ReadingView({ data, save, today }) {
+        const [showAdd, setShowAdd] = useState(false);
+        const [title, setTitle]     = useState('');
+        const [pages, setPages]     = useState('');
+        const [pageInputs, setPageInputs] = useState({});
+        const logs = data.dailyLogs;
+
+        const totalPgs   = Object.values(logs).reduce((s,l)=>s+(l.pagesRead||0),0);
+        const readDays   = Object.values(logs).filter(l=>(l.pagesRead||0)>0).length;
+        const avgPgs     = readDays>0?(totalPgs/readDays).toFixed(0):0;
+        const finished   = data.books.filter(b=>b.finishedDate);
+        const active     = data.books.filter(b=>!b.finishedDate);
+
+        const history = Object.entries(logs).filter(([_,l])=>(l.pagesRead||0)>0).sort(([a],[b])=>b<a?-1:1).slice(0,20);
+
+        const addBook = () => {
+            if (!title.trim()||!pages) return;
+            const book={id:Date.now(),title:title.trim(),totalPages:parseInt(pages),currentPage:0,startDate:fmtDate(new Date()),finishedDate:null};
+            save({...data,books:[...data.books,book],currentBookId:book.id});
+            setTitle(''); setPages(''); setShowAdd(false);
+        };
+        const setPage = bookId => {
+            const p=parseInt(pageInputs[bookId]); if(isNaN(p)||p<0) return;
+            const book=data.books.find(b=>b.id===bookId);
+            const np=Math.min(p,book.totalPages); const done=np>=book.totalPages;
+            save({...data,books:data.books.map(b=>b.id===bookId?{...b,currentPage:np,finishedDate:done&&!b.finishedDate?fmtDate(new Date()):b.finishedDate}:b),currentBookId:done&&data.currentBookId===bookId?null:data.currentBookId});
+            setPageInputs(p=>({...p,[bookId]:''}));
+        };
+
+        return (
+            <div className="space-y-5">
+                <div className="flex justify-between items-center">
+                    <div><h2 className="text-xl font-bold text-slate-800">📖 Reading</h2><p className="text-sm text-slate-400 mt-0.5">Build the habit — every page counts</p></div>
+                    <button onClick={()=>setShowAdd(!showAdd)} className="px-4 py-2 bg-amber-500 text-white text-sm rounded-xl font-medium hover:bg-amber-600 transition">+ Add Book</button>
+                </div>
+
+                {/* Stats */}
+                <div className="grid grid-cols-4 gap-3">
+                    <StatTile big={totalPgs} sub="total pages" />
+                    <StatTile big={readDays} sub="days read" />
+                    <StatTile big={avgPgs} sub="avg/day" />
+                    <StatTile big={finished.length} sub="books done" />
+                </div>
+
+                {/* Add book form */}
                 {showAdd && (
                     <div className="bg-white rounded-2xl p-5 border border-amber-200 border-l-4 border-l-amber-500">
                         <h3 className="font-semibold text-slate-800 mb-3">New Book</h3>
                         <div className="space-y-2">
-                            <input type="text" value={title} onChange={e=>setTitle(e.target.value)}
-                                placeholder="Book title" onKeyDown={e=>e.key==='Enter'&&addBook()}
-                                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500" />
-                            <input type="number" value={pages} onChange={e=>setPages(e.target.value)}
-                                placeholder="Total pages"
-                                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500" />
+                            <input type="text" value={title} onChange={e=>setTitle(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addBook()}
+                                placeholder="Book title" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500"/>
+                            <input type="number" value={pages} onChange={e=>setPages(e.target.value)} placeholder="Total pages"
+                                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500"/>
                             <div className="flex gap-2">
-                                <button onClick={addBook} className="flex-1 py-2.5 bg-amber-500 text-white text-sm rounded-xl font-medium hover:bg-amber-600 transition">Add Book</button>
+                                <button onClick={addBook} className="flex-1 py-2.5 bg-amber-500 text-white text-sm rounded-xl font-medium hover:bg-amber-600 transition">Add</button>
                                 <button onClick={()=>setShowAdd(false)} className="px-4 py-2.5 bg-slate-100 text-slate-600 text-sm rounded-xl hover:bg-slate-200 transition">Cancel</button>
                             </div>
                         </div>
@@ -928,74 +711,51 @@
                 )}
 
                 {/* Active books */}
-                {active.map(book => {
-                    const pct = book.totalPages > 0 ? (book.currentPage/book.totalPages*100) : 0;
-                    const cur = book.id === data.currentBookId;
-                    // Pages from daily logs for this book
-                    const bookPages = Object.values(data.dailyLogs)
-                        .filter(l => l.readingBookId === book.id)
-                        .reduce((s,l) => s+(l.pagesRead||0), 0);
+                {active.map(book=>{
+                    const pct=book.totalPages>0?(book.currentPage/book.totalPages*100):0;
+                    const cur=book.id===data.currentBookId;
+                    const bookPgs=Object.values(logs).filter(l=>l.readingBookId===book.id).reduce((s,l)=>s+(l.pagesRead||0),0);
                     return (
                         <div key={book.id} className={`bg-white rounded-2xl p-5 border ${cur?'border-amber-300 border-l-4 border-l-amber-500':'border-slate-100'}`}>
                             <div className="flex justify-between items-start mb-3">
                                 <div className="flex-1 pr-3">
                                     <h4 className="font-semibold text-slate-800">{book.title}</h4>
-                                    <p className="text-xs text-slate-400 mt-0.5">Started {book.startDate}{bookPages > 0 ? ` · ${bookPages} pages logged via daily log` : ''}</p>
+                                    <p className="text-xs text-slate-400 mt-0.5">Started {book.startDate}{bookPgs>0?` · ${bookPgs} pages via daily log`:''}</p>
                                 </div>
-                                {cur
-                                    ? <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-lg font-medium">Reading now</span>
-                                    : <button onClick={() => save({...data, currentBookId:book.id})}
-                                        className="text-xs text-amber-600 border border-amber-300 px-2 py-1 rounded-lg hover:bg-amber-50 transition">
-                                        Set current
-                                      </button>
-                                }
+                                {cur ? <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-lg font-medium">Reading now</span>
+                                     : <button onClick={()=>save({...data,currentBookId:book.id})} className="text-xs text-amber-600 border border-amber-300 px-2 py-1 rounded-lg hover:bg-amber-50 transition">Set current</button>}
                             </div>
-
                             <div className="mb-3">
                                 <div className="flex justify-between text-xs text-slate-500 mb-1.5">
                                     <span>Page {book.currentPage} of {book.totalPages}</span>
                                     <span className="font-semibold">{pct.toFixed(0)}%</span>
                                 </div>
-                                <div className="bg-slate-100 rounded-full h-3">
-                                    <div className="bg-amber-500 rounded-full h-3 transition-all" style={{width:`${pct}%`}} />
-                                </div>
-                                {book.totalPages - book.currentPage > 0 && (
-                                    <p className="text-xs text-slate-400 mt-1">{book.totalPages - book.currentPage} pages left</p>
-                                )}
+                                <div className="bg-slate-100 rounded-full h-3"><div className="bg-amber-500 rounded-full h-3 transition-all" style={{width:`${pct}%`}}/></div>
+                                {book.totalPages-book.currentPage>0&&<p className="text-xs text-slate-400 mt-1">{book.totalPages-book.currentPage} pages left</p>}
                             </div>
-
                             <div className="flex gap-2">
-                                <input type="number" min="0" max={book.totalPages}
-                                    value={pageInputs[book.id]||''}
-                                    onChange={e => setPageInputs(p=>({...p,[book.id]:e.target.value}))}
-                                    onKeyDown={e => e.key==='Enter' && updatePage(book.id)}
+                                <input type="number" min="0" max={book.totalPages} value={pageInputs[book.id]||''} onChange={e=>setPageInputs(p=>({...p,[book.id]:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&setPage(book.id)}
                                     placeholder={`Set page directly (now: ${book.currentPage})`}
-                                    className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500" />
-                                <button onClick={() => updatePage(book.id)}
-                                    className="px-4 py-2.5 bg-amber-500 text-white text-sm rounded-xl font-medium hover:bg-amber-600 transition">
-                                    Set
-                                </button>
+                                    className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500"/>
+                                <button onClick={()=>setPage(book.id)} className="px-4 py-2.5 bg-amber-500 text-white text-sm rounded-xl font-medium hover:bg-amber-600 transition">Set</button>
                             </div>
-                            <p className="text-xs text-slate-400 mt-1.5">Tip: log pages in Today tab to auto-update progress.</p>
+                            <p className="text-xs text-slate-400 mt-1.5">Log pages in the Log tab to auto-update progress.</p>
                         </div>
                     );
                 })}
 
-                {/* Daily reading history */}
-                {readingHistory.length > 0 && (
+                {/* Daily history */}
+                {history.length>0 && (
                     <div className="bg-white rounded-2xl p-5 border border-slate-100">
-                        <p className="font-semibold text-slate-800 mb-3">📅 Reading Log</p>
+                        <p className="font-semibold text-slate-800 mb-3">Reading Log</p>
                         <div className="space-y-1.5">
-                            {readingHistory.map(([date, log]) => {
-                                const book = data.books.find(b => b.id === log.readingBookId);
-                                const d    = parseD(date);
+                            {history.map(([date,log])=>{
+                                const book=data.books.find(b=>b.id===log.readingBookId);
                                 return (
                                     <div key={date} className="flex items-center gap-3 py-1.5 border-b border-slate-50 last:border-0">
-                                        <span className="text-xs text-slate-400 w-20 flex-shrink-0">
-                                            {d.toLocaleDateString('en-US',{month:'short',day:'numeric'})}
-                                        </span>
-                                        <span className="text-sm font-semibold text-amber-600">{log.pagesRead} pages</span>
-                                        <span className="text-xs text-slate-500 truncate">{book?.title || '—'}</span>
+                                        <span className="text-xs text-slate-400 w-20 flex-shrink-0">{parseD(date).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>
+                                        <span className="text-sm font-semibold text-amber-600">{log.pagesRead}p</span>
+                                        <span className="text-xs text-slate-500 truncate">{book?.title||'—'}</span>
                                     </div>
                                 );
                             })}
@@ -1004,254 +764,258 @@
                 )}
 
                 {/* Finished */}
-                {finished.length > 0 && (
+                {finished.length>0 && (
                     <div className="bg-white rounded-2xl p-5 border border-slate-100">
                         <p className="font-semibold text-slate-800 mb-3">✅ Finished — {finished.length} book{finished.length>1?'s':''}</p>
                         <div className="space-y-2">
-                            {finished.map(b => (
+                            {finished.map(b=>(
                                 <div key={b.id} className="flex items-center gap-3 p-2">
                                     <span className="text-lg">📗</span>
-                                    <div>
-                                        <p className="text-sm font-medium text-slate-700">{b.title}</p>
-                                        <p className="text-xs text-slate-400">Finished {b.finishedDate} · {b.totalPages} pages</p>
-                                    </div>
+                                    <div><p className="text-sm font-medium text-slate-700">{b.title}</p><p className="text-xs text-slate-400">Finished {b.finishedDate} · {b.totalPages} pages</p></div>
                                 </div>
                             ))}
                         </div>
                     </div>
                 )}
 
-                {data.books.length === 0 && !showAdd && (
-                    <div className="text-center py-16 text-slate-400">
-                        <div className="text-5xl mb-3">📚</div>
-                        <p className="font-medium">No books yet</p>
-                        <p className="text-sm mt-1">Hit "Add Book" to start tracking your reading habit.</p>
-                    </div>
+                {data.books.length===0&&!showAdd&&(
+                    <div className="text-center py-16 text-slate-400"><div className="text-5xl mb-3">📚</div><p className="font-medium">No books yet</p><p className="text-sm mt-1">Add your first book above.</p></div>
                 )}
+
+                <MonthlyNotes data={data} save={save} noteKey="reading" title="Monthly Reading Notes" today={today} color="focus:border-amber-400" />
             </div>
         );
     }
 
-    // ─── WEALTH ───────────────────────────────────────────────────────────────
-    function Wealth({ data, save, privacy }) {
-        const logs = [...(data.netWorthLogs||[])].sort((a,b) => a.date<b.date?-1:1);
-        const [showForm, setShowForm] = useState(false);
-        const [form, setForm] = useState({
-            date: fmtDate(new Date()), demat:'', crypto:'', bank:'', creditCard:''
+    // ── WORK VIEW ─────────────────────────────────────────────────────────────
+    function WorkView({ data, save, today }) {
+        const logs = data.dailyLogs;
+        const ws   = getWeekStart(today);
+        const wDates = getWeekDates(ws);
+
+        const hoursWk  = wDates.reduce((s,d)=>s+(parseFloat(logs[d]?.workHours)||0),0);
+        const hoursMth = Object.entries(logs).filter(([d])=>d.startsWith(today.substring(0,7))).reduce((s,[_,l])=>s+(parseFloat(l.workHours)||0),0);
+        const allDays  = Object.entries(logs).filter(([d])=>d>=CHALLENGE_START).filter(([_,l])=>(parseFloat(l.workHours)||0)>0);
+        const bestDay  = allDays.length ? Math.max(...allDays.map(([_,l])=>parseFloat(l.workHours)||0)) : 0;
+
+        // Last 14 days
+        const last14 = Array.from({length:14},(_,i)=>{
+            const d=parseD(today); d.setDate(d.getDate()-13+i);
+            const ds=fmtDate(d);
+            return {ds,label:parseD(ds).toLocaleDateString('en-US',{weekday:'narrow'}),hours:parseFloat(logs[ds]?.workHours)||0};
         });
+        const maxH = Math.max(8,...last14.map(d=>d.hours));
+
+        return (
+            <div className="space-y-5">
+                <div>
+                    <h2 className="text-xl font-bold text-slate-800">💼 Work</h2>
+                    <p className="text-sm text-slate-400 mt-0.5">Professional focus — deep work every day</p>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                    <StatTile big={`${hoursWk.toFixed(1)}h`} sub="this week" icon="📅" />
+                    <StatTile big={`${hoursMth.toFixed(0)}h`} sub="this month" icon="📆" />
+                    <StatTile big={`${bestDay}h`} sub="best day" icon="🏆" />
+                </div>
+
+                {/* 14-day bars */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-100">
+                    <p className="font-semibold text-slate-800 mb-4">Last 14 Days</p>
+                    <div className="flex gap-1 items-end" style={{height:'90px'}}>
+                        {last14.map(d=>{
+                            const pct=(d.hours/maxH)*100;
+                            const isT=d.ds===today;
+                            return (
+                                <div key={d.ds} className="flex-1 flex flex-col items-center gap-0.5">
+                                    <div className="w-full bg-slate-100 rounded-t relative" style={{height:'72px'}}>
+                                        <div className={`absolute bottom-0 w-full rounded-t transition-all ${d.hours>=8?'bg-violet-500':d.hours>0?'bg-violet-300':''}`} style={{height:`${pct}%`}}/>
+                                    </div>
+                                    <span className={`text-xs ${isT?'font-bold text-violet-600':'text-slate-400'}`}>{d.label}</span>
+                                    {d.hours>0&&<span className="text-xs text-violet-500">{d.hours}h</span>}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Monthly breakdown */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-100">
+                    <p className="font-semibold text-slate-800 mb-4">Monthly Breakdown</p>
+                    <div className="space-y-2.5">
+                        {MONTHS.map(m=>{
+                            const h=Object.entries(logs).filter(([d])=>d.startsWith(m.key)).reduce((s,[_,l])=>s+(parseFloat(l.workHours)||0),0);
+                            const isCur=today.startsWith(m.key);
+                            const fut=m.key>today.substring(0,7);
+                            const days=Object.entries(logs).filter(([d])=>d.startsWith(m.key)&&(parseFloat(logs[d]?.workHours)||0)>0).length;
+                            return (
+                                <div key={m.key} className={fut?'opacity-30':''}>
+                                    <div className="flex justify-between text-xs mb-1">
+                                        <span className={isCur?'font-semibold text-violet-700':'text-slate-600'}>{m.label}{isCur?' ← now':''}</span>
+                                        <span className={h>0?'text-violet-600 font-semibold':'text-slate-300'}>{h.toFixed(0)}h · {days} days</span>
+                                    </div>
+                                    <div className="bg-slate-100 rounded-full h-2">
+                                        <div className="bg-violet-500 rounded-full h-2 transition-all" style={{width:`${Math.min(100,(h/200)*100)}%`}}/>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                <MonthlyNotes data={data} save={save} noteKey="work" title="Monthly Work Notes" today={today} color="focus:border-violet-400" />
+            </div>
+        );
+    }
+
+    // ── WEALTH VIEW ───────────────────────────────────────────────────────────
+    function WealthView({ data, save, privacy, today }) {
+        const logs = [...(data.netWorthLogs||[])].sort((a,b)=>a.date<b.date?-1:1);
+        const [showForm, setShowForm] = useState(false);
+        const [form, setForm] = useState({date:fmtDate(new Date()),demat:'',crypto:'',bank:'',creditCard:''});
         const [editDate, setEditDate] = useState(null);
 
         const latest = logs.length ? logs[logs.length-1] : null;
         const nw     = latest ? calcNW(latest) : null;
-        const nwPct  = nw !== null ? Math.min(100,(nw/NW_GOAL)*100) : 0;
+        const prev   = logs.length>1 ? logs[logs.length-2] : null;
+        const delta  = nw!==null && prev ? nw-calcNW(prev) : null;
+        const nwPct  = nw!==null ? Math.min(100,(nw/NW_GOAL)*100) : 0;
 
-        // Previous entry for delta
-        const prev   = logs.length > 1 ? logs[logs.length-2] : null;
-        const prevNW = prev ? calcNW(prev) : null;
-        const delta  = nw !== null && prevNW !== null ? nw - prevNW : null;
+        // Bimonthly reminder
+        const daysSince = latest ? daysBetween(latest.date, today) : 999;
+        const showReminder = daysSince > 13;
 
-        const setF = (k, v) => setForm(f => ({...f, [k]:v}));
-
-        const startAdd = () => {
-            setForm({ date: fmtDate(new Date()), demat:'', crypto:'', bank:'', creditCard:'' });
-            setEditDate(null);
-            setShowForm(true);
-        };
-
-        const startEdit = (entry) => {
-            setForm({
-                date: entry.date,
-                demat:      String(entry.demat      || ''),
-                crypto:     String(entry.crypto     || ''),
-                bank:       String(entry.bank       || ''),
-                creditCard: String(entry.creditCard || ''),
-            });
-            setEditDate(entry.date);
-            setShowForm(true);
-        };
-
+        const setF = (k,v) => setForm(f=>({...f,[k]:v}));
+        const startAdd = () => { setForm({date:fmtDate(new Date()),demat:'',crypto:'',bank:'',creditCard:''});setEditDate(null);setShowForm(true); };
+        const startEdit = e => { setForm({date:e.date,demat:String(e.demat||''),crypto:String(e.crypto||''),bank:String(e.bank||''),creditCard:String(e.creditCard||'')});setEditDate(e.date);setShowForm(true); };
         const saveEntry = () => {
-            const entry = {
-                date:       form.date,
-                demat:      parseFloat(form.demat)      || 0,
-                crypto:     parseFloat(form.crypto)     || 0,
-                bank:       parseFloat(form.bank)       || 0,
-                creditCard: parseFloat(form.creditCard) || 0,
-            };
-            // Replace existing same-date entry
-            const existing = (data.netWorthLogs||[]).filter(l => l.date !== entry.date);
-            save({ ...data, netWorthLogs: [...existing, entry] });
-            setShowForm(false);
-            setEditDate(null);
+            const entry={date:form.date,demat:parseFloat(form.demat)||0,crypto:parseFloat(form.crypto)||0,bank:parseFloat(form.bank)||0,creditCard:parseFloat(form.creditCard)||0};
+            save({...data,netWorthLogs:[...(data.netWorthLogs||[]).filter(l=>l.date!==entry.date),entry]});
+            setShowForm(false); setEditDate(null);
         };
-
-        const deleteEntry = (date) => {
-            save({ ...data, netWorthLogs: (data.netWorthLogs||[]).filter(l => l.date !== date) });
-        };
-
-        const formNW = (parseFloat(form.demat)||0) + (parseFloat(form.crypto)||0) +
-                       (parseFloat(form.bank)||0)  - (parseFloat(form.creditCard)||0);
+        const del = date => save({...data,netWorthLogs:(data.netWorthLogs||[]).filter(l=>l.date!==date)});
+        const formNW=(parseFloat(form.demat)||0)+(parseFloat(form.crypto)||0)+(parseFloat(form.bank)||0)-(parseFloat(form.creditCard)||0);
 
         return (
             <div className="space-y-5">
                 <div className="flex justify-between items-center">
-                    <div>
-                        <h2 className="text-xl font-bold text-slate-800">💰 Net Worth</h2>
-                        <p className="text-sm text-slate-400 mt-0.5">Goal: ₹6L by Aug 31, 2026</p>
-                    </div>
-                    <button onClick={startAdd}
-                        className="px-4 py-2 bg-green-600 text-white text-sm rounded-xl font-medium hover:bg-green-700 transition">
-                        + Log Entry
-                    </button>
+                    <div><h2 className="text-xl font-bold text-slate-800">💰 Net Worth</h2><p className="text-sm text-slate-400 mt-0.5">Goal: ₹6L by Aug 31, 2026</p></div>
+                    <button onClick={startAdd} className="px-4 py-2 bg-green-600 text-white text-sm rounded-xl font-medium hover:bg-green-700 transition">+ Log Entry</button>
                 </div>
 
-                {/* Current NW card */}
-                {nw !== null && (
+                {/* Bimonthly reminder */}
+                {showReminder && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3">
+                        <span className="text-2xl">📊</span>
+                        <div className="flex-1">
+                            <p className="font-semibold text-amber-800 text-sm">Time for your bimonthly snapshot</p>
+                            <p className="text-xs text-amber-600 mt-0.5">{latest?`Last logged ${daysSince} days ago (${latest.date})`:'Never logged — log your first entry.'}</p>
+                        </div>
+                        <button onClick={startAdd} className="text-xs bg-amber-500 text-white px-3 py-1.5 rounded-xl font-medium hover:bg-amber-600 transition">Log now</button>
+                    </div>
+                )}
+
+                {/* Hero card */}
+                {nw!==null && (
                     <div className="bg-gradient-to-br from-green-600 to-emerald-700 text-white rounded-2xl p-6">
-                        <p className="text-sm opacity-75 mb-1">Current Net Worth</p>
-                        <p className="text-5xl font-bold">{fmtMoney(nw, privacy)}</p>
-                        {delta !== null && !privacy && (
-                            <p className={`text-sm mt-1 ${delta >= 0 ? 'opacity-90' : 'text-red-200'}`}>
-                                {delta >= 0 ? '↑' : '↓'} {fmtMoney(Math.abs(delta), false)} since last entry
-                            </p>
-                        )}
+                        <p className="text-sm opacity-75">Current Net Worth</p>
+                        <p className="text-5xl font-bold mt-1">{fmtMoney(nw,privacy)}</p>
+                        {delta!==null&&!privacy&&<p className={`text-sm mt-1 ${delta>=0?'opacity-80':'text-red-200'}`}>{delta>=0?'↑':'↓'} {fmtMoney(Math.abs(delta),false)} since last entry</p>}
                         <div className="mt-4">
-                            <div className="flex justify-between text-xs opacity-75 mb-1">
+                            <div className="flex justify-between text-xs opacity-75 mb-1.5">
                                 <span>{nwPct.toFixed(0)}% of ₹6L goal</span>
-                                <span>{fmtMoney(Math.max(0, NW_GOAL - (nw||0)), privacy)} to go</span>
+                                <span>{fmtMoney(Math.max(0,NW_GOAL-(nw||0)),privacy)} to go</span>
                             </div>
-                            <div className="bg-white/20 rounded-full h-2.5">
-                                <div className="bg-white rounded-full h-2.5 transition-all" style={{width:`${nwPct}%`}} />
-                            </div>
+                            <div className="bg-white/20 rounded-full h-2.5"><div className="bg-white rounded-full h-2.5 transition-all" style={{width:`${nwPct}%`}}/></div>
                         </div>
                         <p className="text-xs opacity-50 mt-3">Last updated: {latest.date}</p>
                     </div>
                 )}
 
-                {/* Breakdown of latest entry */}
+                {/* Breakdown */}
                 {latest && (
                     <div className="bg-white rounded-2xl p-5 border border-slate-100">
                         <p className="font-semibold text-slate-800 mb-4">Breakdown — {latest.date}</p>
                         <div className="space-y-3">
-                            <NWBar label="📈 Demat (stocks + MFs)" val={latest.demat||0}   color="bg-blue-500"    privacy={privacy} total={nw} />
-                            <NWBar label="🔶 Crypto"               val={latest.crypto||0}  color="bg-orange-500"  privacy={privacy} total={nw} />
-                            <NWBar label="🏦 Bank balance"          val={latest.bank||0}    color="bg-emerald-500" privacy={privacy} total={nw} />
-                            <div className="border-t border-slate-100 pt-3">
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-slate-600">💳 Credit card (liability)</span>
-                                    <span className={`font-semibold ${privacy ? 'text-slate-400' : 'text-red-500'}`}>
-                                        {privacy ? '••••' : `- ${fmtMoney(latest.creditCard||0, false)}`}
-                                    </span>
+                            {[
+                                {label:'📈 Demat (stocks + MFs)',val:latest.demat||0,color:'bg-blue-500'},
+                                {label:'🔶 Crypto',             val:latest.crypto||0,color:'bg-orange-500'},
+                                {label:'🏦 Bank balance',       val:latest.bank||0,  color:'bg-emerald-500'},
+                            ].map(r=>(
+                                <div key={r.label}>
+                                    <div className="flex justify-between text-sm mb-1">
+                                        <span className="text-slate-600">{r.label}</span>
+                                        <span className="font-semibold text-slate-700">{fmtMoney(r.val,privacy)}</span>
+                                    </div>
+                                    <div className="bg-slate-100 rounded-full h-2"><div className={`${r.color} rounded-full h-2`} style={{width:`${nw>0?Math.min(100,(r.val/nw)*100):0}%`}}/></div>
                                 </div>
+                            ))}
+                            <div className="border-t border-slate-100 pt-3 flex justify-between text-sm">
+                                <span className="text-slate-600">💳 Credit card (liability)</span>
+                                <span className={`font-semibold ${privacy?'text-slate-400':'text-red-500'}`}>{privacy?'••••':`- ${fmtMoney(latest.creditCard||0,false)}`}</span>
                             </div>
                         </div>
                     </div>
                 )}
 
-                {/* NW chart */}
-                {logs.length >= 2 && (
+                {/* Chart */}
+                {logs.length>=2 && (
                     <div className="bg-white rounded-2xl p-5 border border-slate-100">
                         <p className="font-semibold text-slate-800 mb-1">Net Worth Over Time</p>
                         <div className="text-xs text-green-600 font-medium mb-4">─ Target ₹6L</div>
-                        <NWChart logs={logs} privacy={privacy} />
+                        <NWChart logs={logs} privacy={privacy}/>
                     </div>
                 )}
 
                 {/* Log form */}
                 {showForm && (
                     <div className="bg-white rounded-2xl p-5 border border-green-200 border-l-4 border-l-green-500">
-                        <h3 className="font-semibold text-slate-800 mb-4">
-                            {editDate ? `Edit Entry — ${editDate}` : 'Log Net Worth'}
-                        </h3>
+                        <h3 className="font-semibold text-slate-800 mb-4">{editDate?`Edit — ${editDate}`:'Log Net Worth'}</h3>
                         <div className="space-y-3">
-                            <div>
-                                <label className="text-xs font-medium text-slate-500 block mb-1">Date</label>
-                                <input type="date" value={form.date} onChange={e => setF('date', e.target.value)}
-                                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500" />
-                            </div>
-                            {[
-                                { k:'demat',      label:'📈 Demat (stocks + mutual funds)', placeholder:'e.g. 150000', color:'focus:border-blue-500' },
-                                { k:'crypto',     label:'🔶 Crypto',                         placeholder:'e.g. 50000',  color:'focus:border-orange-500' },
-                                { k:'bank',       label:'🏦 Bank balance',                   placeholder:'e.g. 80000',  color:'focus:border-emerald-500' },
-                                { k:'creditCard', label:'💳 Credit card outstanding',         placeholder:'e.g. 20000',  color:'focus:border-red-400' },
-                            ].map(f => (
-                                <div key={f.k}>
-                                    <label className="text-xs font-medium text-slate-500 block mb-1">{f.label}</label>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm text-slate-400 flex-shrink-0">₹</span>
-                                        <input type="number" min="0" value={form[f.k]} onChange={e => setF(f.k, e.target.value)}
-                                            placeholder={f.placeholder}
-                                            className={`flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none ${f.color}`} />
-                                    </div>
+                            <div><label className="text-xs font-medium text-slate-500 block mb-1">Date</label>
+                                <input type="date" value={form.date} onChange={e=>setF('date',e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500"/></div>
+                            {[{k:'demat',label:'📈 Demat (stocks + mutual funds)',ph:'e.g. 150000'},{k:'crypto',label:'🔶 Crypto',ph:'e.g. 50000'},{k:'bank',label:'🏦 Bank balance',ph:'e.g. 80000'},{k:'creditCard',label:'💳 Credit card outstanding',ph:'e.g. 20000'}].map(f=>(
+                                <div key={f.k}><label className="text-xs font-medium text-slate-500 block mb-1">{f.label}</label>
+                                    <div className="flex items-center gap-2"><span className="text-sm text-slate-400">₹</span>
+                                        <input type="number" min="0" value={form[f.k]} onChange={e=>setF(f.k,e.target.value)} placeholder={f.ph}
+                                            className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500"/></div>
                                 </div>
                             ))}
-
-                            {/* Live NW preview */}
-                            <div className={`rounded-xl p-3 text-center ${formNW >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
+                            <div className={`rounded-xl p-3 text-center ${formNW>=0?'bg-green-50':'bg-red-50'}`}>
                                 <p className="text-xs text-slate-500">Net Worth Preview</p>
-                                <p className={`text-xl font-bold mt-0.5 ${formNW >= 0 ? 'text-green-700' : 'text-red-600'}`}>
-                                    {fmtMoney(formNW, false)}
-                                </p>
-                                <p className="text-xs text-slate-400 mt-0.5">
-                                    {((formNW/NW_GOAL)*100).toFixed(1)}% of ₹6L goal
-                                </p>
+                                <p className={`text-xl font-bold mt-0.5 ${formNW>=0?'text-green-700':'text-red-600'}`}>{fmtMoney(formNW,false)}</p>
+                                <p className="text-xs text-slate-400 mt-0.5">{((formNW/NW_GOAL)*100).toFixed(1)}% of ₹6L</p>
                             </div>
-
                             <div className="flex gap-2">
-                                <button onClick={saveEntry}
-                                    className="flex-1 py-2.5 bg-green-600 text-white text-sm rounded-xl font-medium hover:bg-green-700 transition">
-                                    Save Entry
-                                </button>
-                                <button onClick={() => { setShowForm(false); setEditDate(null); }}
-                                    className="px-4 py-2.5 bg-slate-100 text-slate-600 text-sm rounded-xl hover:bg-slate-200 transition">
-                                    Cancel
-                                </button>
+                                <button onClick={saveEntry} className="flex-1 py-2.5 bg-green-600 text-white text-sm rounded-xl font-medium hover:bg-green-700 transition">Save</button>
+                                <button onClick={()=>{setShowForm(false);setEditDate(null);}} className="px-4 py-2.5 bg-slate-100 text-slate-600 text-sm rounded-xl hover:bg-slate-200 transition">Cancel</button>
                             </div>
                         </div>
                     </div>
                 )}
 
                 {/* History */}
-                {logs.length > 0 && (
+                {logs.length>0 && (
                     <div className="bg-white rounded-2xl p-5 border border-slate-100">
                         <p className="font-semibold text-slate-800 mb-4">All Entries</p>
                         <div className="space-y-2">
-                            {[...logs].reverse().map((entry, idx) => {
-                                const enw  = calcNW(entry);
-                                const prev = logs[logs.length - 2 - idx];
-                                const pd   = prev ? calcNW(prev) : null;
-                                const d    = pd !== null ? enw - pd : null;
+                            {[...logs].reverse().map((entry,idx)=>{
+                                const enw=calcNW(entry);
+                                const pd=logs[logs.length-2-idx];
+                                const d=pd?enw-calcNW(pd):null;
                                 return (
                                     <div key={entry.date} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition">
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2">
                                                 <span className="text-sm font-semibold text-slate-700">{entry.date}</span>
-                                                {d !== null && !privacy && (
-                                                    <span className={`text-xs font-medium ${d >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                                                        {d >= 0 ? '+' : ''}{fmtMoney(d, false)}
-                                                    </span>
-                                                )}
+                                                {d!==null&&!privacy&&<span className={`text-xs font-medium ${d>=0?'text-green-600':'text-red-500'}`}>{d>=0?'+':''}{fmtMoney(d,false)}</span>}
                                             </div>
-                                            {!privacy && (
-                                                <div className="text-xs text-slate-400 mt-0.5">
-                                                    D:{fmtMoney(entry.demat||0,false)} · C:{fmtMoney(entry.crypto||0,false)} · B:{fmtMoney(entry.bank||0,false)} · CC:-{fmtMoney(entry.creditCard||0,false)}
-                                                </div>
-                                            )}
+                                            {!privacy&&<div className="text-xs text-slate-400 mt-0.5">D:{fmtMoney(entry.demat||0,false)} · C:{fmtMoney(entry.crypto||0,false)} · B:{fmtMoney(entry.bank||0,false)} · CC:-{fmtMoney(entry.creditCard||0,false)}</div>}
                                         </div>
-                                        <div className="text-right flex-shrink-0">
-                                            <div className={`font-bold text-sm ${privacy ? 'text-slate-400' : 'text-green-700'}`}>
-                                                {fmtMoney(enw, privacy)}
-                                            </div>
-                                        </div>
+                                        <div className={`font-bold text-sm ${privacy?'text-slate-400':'text-green-700'}`}>{fmtMoney(enw,privacy)}</div>
                                         <div className="flex gap-1">
-                                            <button onClick={() => startEdit(entry)}
-                                                className="text-xs text-blue-500 border border-blue-200 px-2 py-1 rounded-lg hover:bg-blue-50 transition">
-                                                Edit
-                                            </button>
-                                            <button onClick={() => deleteEntry(entry.date)}
-                                                className="text-xs text-red-400 border border-red-200 px-2 py-1 rounded-lg hover:bg-red-50 transition">
-                                                ✕
-                                            </button>
+                                            <button onClick={()=>startEdit(entry)} className="text-xs text-blue-500 border border-blue-200 px-2 py-1 rounded-lg hover:bg-blue-50 transition">Edit</button>
+                                            <button onClick={()=>del(entry.date)} className="text-xs text-red-400 border border-red-200 px-2 py-1 rounded-lg hover:bg-red-50 transition">✕</button>
                                         </div>
                                     </div>
                                 );
@@ -1260,218 +1024,136 @@
                     </div>
                 )}
 
-                {logs.length === 0 && !showForm && (
-                    <div className="text-center py-16 text-slate-400">
-                        <div className="text-5xl mb-3">💰</div>
-                        <p className="font-medium">No entries yet</p>
-                        <p className="text-sm mt-1">Log your first net worth snapshot to start tracking.</p>
-                    </div>
+                {logs.length===0&&!showForm&&(
+                    <div className="text-center py-16 text-slate-400"><div className="text-5xl mb-3">💰</div><p className="font-medium">No entries yet</p><p className="text-sm mt-1">Log your first snapshot to start tracking.</p></div>
                 )}
+
+                <MonthlyNotes data={data} save={save} noteKey="wealth" title="Monthly Wealth Notes" today={today} color="focus:border-green-400" />
             </div>
         );
     }
 
-    function NWBar({ label, val, color, privacy, total }) {
-        const pct = total > 0 ? Math.min(100, (val / total) * 100) : 0;
+    // ── SHARED COMPONENTS ─────────────────────────────────────────────────────
+    function MiniBar({ pct }) {
+        return <div className="mt-2 bg-white/20 rounded-full h-1.5"><div className="bg-white rounded-full h-1.5" style={{width:`${Math.min(100,pct)}%`}}/></div>;
+    }
+    function HBar({ label, val, max, color, unit='', dec=0 }) {
+        const pct=Math.min(100,(val/max)*100), done=val>=max;
         return (
             <div>
                 <div className="flex justify-between text-sm mb-1">
                     <span className="text-slate-600">{label}</span>
-                    <span className="font-semibold text-slate-700">{privacy ? '••••' : fmtMoney(val, false)}</span>
+                    <span className={`font-semibold ${done?'text-emerald-600':'text-slate-500'}`}>{dec?val.toFixed(dec):val}{unit}/{max}{unit}{done?' ✓':''}</span>
                 </div>
-                <div className="bg-slate-100 rounded-full h-2">
-                    <div className={`${color} rounded-full h-2 transition-all`} style={{width:`${pct}%`}} />
+                <div className="bg-slate-100 rounded-full h-2"><div className={`${color} rounded-full h-2 transition-all`} style={{width:`${pct}%`}}/></div>
+            </div>
+        );
+    }
+    function Section({ title, accent, children }) {
+        return (
+            <div className={`bg-white rounded-2xl p-5 border border-slate-100 border-l-4 ${accent}`}>
+                <h3 className="font-semibold text-slate-800 mb-3">{title}</h3>
+                <div className="space-y-2">{children}</div>
+            </div>
+        );
+    }
+    function Toggle({ checked, onChange, label, sub, warn }) {
+        return (
+            <div className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer select-none transition-colors ${checked?(warn?'bg-orange-50':'bg-emerald-50'):'bg-slate-50 hover:bg-slate-100'}`} onClick={onChange}>
+                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${checked?(warn?'bg-orange-400 border-orange-400':'bg-emerald-500 border-emerald-500'):'border-slate-300'}`}>
+                    {checked&&<span className="text-white text-xs font-bold">✓</span>}
+                </div>
+                <div>
+                    <p className={`text-sm font-medium leading-tight ${checked?(warn?'text-orange-700':'text-emerald-700'):'text-slate-700'}`}>{label}</p>
+                    {sub&&<p className="text-xs text-slate-400">{sub}</p>}
                 </div>
             </div>
         );
+    }
+    function StatTile({ big, sub, icon, bright }) {
+        return (
+            <div className={`rounded-2xl p-4 text-center border ${bright?'bg-orange-50 border-orange-100':'bg-slate-50 border-slate-100'}`}>
+                {icon&&<div className="text-xl mb-1">{icon}</div>}
+                <div className={`text-2xl font-bold ${bright?'text-orange-600':'text-slate-800'}`}>{big}</div>
+                <div className="text-xs text-slate-400 mt-0.5">{sub}</div>
+            </div>
+        );
+    }
+
+    function WeightChart({ entries }) {
+        const ref=useRef(null), ch=useRef(null);
+        useEffect(()=>{
+            if(!ref.current)return; if(ch.current)ch.current.destroy();
+            const labels=entries.map(([d])=>parseD(d).toLocaleDateString('en-US',{month:'short',day:'numeric'}));
+            const weights=entries.map(([_,l])=>l.weight);
+            const mn=Math.max(60,Math.min(...weights)-3);
+            ch.current=new Chart(ref.current,{type:'line',data:{labels,datasets:[
+                {label:'Weight',data:weights,borderColor:'#10b981',backgroundColor:'rgba(16,185,129,0.07)',tension:0.4,fill:true,pointRadius:3,pointBackgroundColor:'#10b981'},
+                {label:'78kg',data:Array(labels.length).fill(78),borderColor:'#f59e0b',borderDash:[6,3],pointRadius:0,fill:false},
+                {label:'81kg',data:Array(labels.length).fill(81),borderColor:'#8b5cf6',borderDash:[4,4],pointRadius:0,fill:false},
+            ]},options:{responsive:true,plugins:{legend:{display:false},tooltip:{mode:'index'}},scales:{y:{min:mn,grid:{color:'#f1f5f9'},ticks:{callback:v=>`${v}kg`}},x:{grid:{display:false},ticks:{maxRotation:0,maxTicksLimit:8}}}}});
+            return ()=>ch.current?.destroy();
+        },[entries]);
+        return <canvas ref={ref} height="180"/>;
     }
 
     function NWChart({ logs, privacy }) {
-        const ref = useRef(null);
-        const ch  = useRef(null);
-        useEffect(() => {
-            if (!ref.current) return;
-            if (ch.current) ch.current.destroy();
-            const labels = logs.map(e => parseD(e.date).toLocaleDateString('en-US',{month:'short',day:'numeric'}));
-            const nwVals = logs.map(e => calcNW(e));
-            const mn = Math.max(0, Math.min(...nwVals) - 50000);
-            ch.current = new Chart(ref.current, {
-                type:'line',
-                data:{ labels, datasets:[
-                    { label:'Net Worth', data: privacy ? nwVals.map(() => null) : nwVals,
-                      borderColor:'#16a34a', backgroundColor:'rgba(22,163,74,0.08)',
-                      tension:0.4, fill:true, pointRadius:4, pointBackgroundColor:'#16a34a' },
-                    { label:'₹6L Goal', data:Array(labels.length).fill(NW_GOAL),
-                      borderColor:'#f59e0b', borderDash:[6,3], pointRadius:0, fill:false },
-                ]},
-                options:{ responsive:true,
-                    plugins:{ legend:{display:false}, tooltip:{
-                        callbacks:{ label: ctx => `₹${ctx.raw?.toLocaleString('en-IN')||''}` }
-                    }},
-                    scales:{
-                        y:{ min:mn, grid:{color:'#f1f5f9'},
-                            ticks:{ callback: v => v>=100000?`₹${(v/100000).toFixed(1)}L`:`₹${(v/1000).toFixed(0)}k` } },
-                        x:{ grid:{display:false}, ticks:{maxRotation:0, maxTicksLimit:8} }
-                    }
-                }
-            });
-            return () => ch.current?.destroy();
-        }, [logs, privacy]);
-        if (privacy) return (
-            <div className="py-10 text-center text-slate-400 text-sm">
-                Numbers hidden — toggle visibility to see chart.
-            </div>
-        );
-        return <canvas ref={ref} height="180" />;
+        const ref=useRef(null), ch=useRef(null);
+        useEffect(()=>{
+            if(!ref.current)return; if(ch.current)ch.current.destroy();
+            const labels=logs.map(e=>parseD(e.date).toLocaleDateString('en-US',{month:'short',day:'numeric'}));
+            const nwVals=logs.map(e=>calcNW(e));
+            const mn=Math.max(0,Math.min(...nwVals)-50000);
+            ch.current=new Chart(ref.current,{type:'line',data:{labels,datasets:[
+                {label:'Net Worth',data:privacy?nwVals.map(()=>null):nwVals,borderColor:'#16a34a',backgroundColor:'rgba(22,163,74,0.08)',tension:0.4,fill:true,pointRadius:4,pointBackgroundColor:'#16a34a'},
+                {label:'₹6L',data:Array(labels.length).fill(NW_GOAL),borderColor:'#f59e0b',borderDash:[6,3],pointRadius:0,fill:false},
+            ]},options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`₹${ctx.raw?.toLocaleString('en-IN')||''}`}}},scales:{y:{min:mn,grid:{color:'#f1f5f9'},ticks:{callback:v=>v>=100000?`₹${(v/100000).toFixed(1)}L`:`₹${(v/1000).toFixed(0)}k`}},x:{grid:{display:false},ticks:{maxRotation:0,maxTicksLimit:8}}}}});
+            return ()=>ch.current?.destroy();
+        },[logs,privacy]);
+        if(privacy)return <div className="py-8 text-center text-slate-400 text-sm">Numbers hidden — toggle to see chart.</div>;
+        return <canvas ref={ref} height="180"/>;
     }
 
-    // ─── GOALS ────────────────────────────────────────────────────────────────
-    function Goals({ data, save, today }) {
-        const [editKey, setEditKey]     = useState(null);
-        const [editNotes, setEditNotes] = useState({ health:'', studies:'', work:'', wealth:'' });
-
-        const MONTHS = [
-            { key:'2026-02', label:'Feb 2026 (start)', theme:'Light the fire' },
-            { key:'2026-03', label:'March 2026',        theme:'Build the foundation' },
-            { key:'2026-04', label:'April 2026',        theme:'Consistency over intensity' },
-            { key:'2026-05', label:'May 2026',          theme:'Momentum builds' },
-            { key:'2026-06', label:'June 2026',         theme:'Final push on weight' },
-            { key:'2026-07', label:'July 2026 🎯',      theme:'78 kg target — then rebuild' },
-            { key:'2026-08', label:'August 2026',       theme:'ISB application season' },
-        ];
-
-        const startEdit = k => {
-            setEditNotes(data.monthlyNotes?.[k] || { health:'', studies:'', work:'', wealth:'' });
-            setEditKey(k);
-        };
-        const saveEdit = () => {
-            save({ ...data, monthlyNotes: { ...(data.monthlyNotes||{}), [editKey]: editNotes } });
-            setEditKey(null);
-        };
-
+    function MonthlyNotes({ data, save, noteKey, title, today, color }) {
+        const [editKey, setEditKey] = useState(null);
+        const [editText, setEditText] = useState('');
         const cur = today.substring(0,7);
-
         return (
-            <div className="space-y-4">
-                <div>
-                    <h2 className="text-xl font-bold text-slate-800 mb-1">Goals</h2>
-                    <p className="text-sm text-slate-400">Your fixed weekly targets + monthly focus areas.</p>
-                </div>
-
-                {/* Fixed weekly targets */}
-                <div className="bg-white rounded-2xl p-5 border border-slate-100 border-l-4 border-l-slate-400">
-                    <p className="font-semibold text-slate-800 mb-4">📋 Weekly Non-Negotiables</p>
-                    <div className="space-y-3">
-                        {[
-                            { icon:'🏋️', label:'Gym', target:'4 sessions per week' },
-                            { icon:'🏃', label:'Running', target:'4 runs per week' },
-                            { icon:'🍵', label:'Green Tea', target:'5 days per week' },
-                            { icon:'🍱', label:'No outside food', target:'6 days out of 7  ·  1 cheat meal allowed' },
-                            { icon:'📚', label:'Study — ISB prep', target:'3h weekdays  ·  5h weekends  (≥21h/week)' },
-                            { icon:'💼', label:'Focused work', target:'Log daily — aim for 8h deep work' },
-                            { icon:'📖', label:'Reading', target:'Log pages daily in Today tab — build the habit' },
-                            { icon:'💰', label:'Net worth', target:'Log monthly snapshot — aim for ₹6L by Aug 2026' },
-                        ].map(r => (
-                            <div key={r.label} className="flex items-start gap-3">
-                                <span className="text-lg mt-0.5 w-6 flex-shrink-0">{r.icon}</span>
-                                <div>
-                                    <p className="text-sm font-medium text-slate-700">{r.label}</p>
-                                    <p className="text-xs text-slate-400">{r.target}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Main goals */}
-                <div className="bg-white rounded-2xl p-5 border border-slate-100">
-                    <p className="font-semibold text-slate-800 mb-4">🎯 The 5 Big Goals</p>
-                    <div className="space-y-3">
-                        {[
-                            { c:'bg-blue-600',   label:'Get into ISB 2026', desc:'GMAT, profile, essays, applications — give it everything.' },
-                            { c:'bg-emerald-600', label:'78 kg by July, 81-82 kg for Hyrox', desc:'Cut to 78 by July. Then lean bulk to Hyrox performance weight.' },
-                            { c:'bg-amber-500',   label:'Inculcate reading as a habit', desc:'Read consistently. Log pages daily. At least one book per month.' },
-                            { c:'bg-violet-600',  label:'Work professionally — keep it a priority', desc:'Show up fully. Log deep work. Treat it with the same seriousness as studies.' },
-                            { c:'bg-green-600',   label:'Reach ₹6L net worth by Aug 2026', desc:'Track demat, crypto, bank, and credit card monthly. Watch the number grow.' },
-                        ].map(g => (
-                            <div key={g.label} className="flex items-start gap-3">
-                                <div className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${g.c}`} />
-                                <div>
-                                    <p className="text-sm font-semibold text-slate-800">{g.label}</p>
-                                    <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{g.desc}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Monthly notes */}
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest pt-2">Monthly Focus</p>
-                {MONTHS.map(m => {
-                    const notes    = data.monthlyNotes?.[m.key];
-                    const hasNotes = notes && (notes.health || notes.studies || notes.work || notes.wealth);
-                    const isCur    = m.key === cur;
-                    const isPast   = m.key < cur;
-                    const isEdit   = editKey === m.key;
-
-                    return (
-                        <div key={m.key} className={`bg-white rounded-2xl p-5 border transition ${
-                            isCur ? 'border-blue-200 border-l-4 border-l-blue-500' : 'border-slate-100'
-                        } ${!isPast && !isCur ? 'opacity-50' : ''}`}>
-                            <div className="flex justify-between items-start mb-1">
-                                <div>
-                                    <p className="font-semibold text-slate-800">{m.label}</p>
-                                    <p className="text-xs text-slate-400 italic">{m.theme}</p>
-                                </div>
-                                <button onClick={() => isEdit ? setEditKey(null) : startEdit(m.key)}
-                                    className="text-xs text-blue-600 border border-blue-200 px-2.5 py-1 rounded-lg hover:bg-blue-50 transition">
-                                    {isEdit ? 'Cancel' : 'Edit'}
-                                </button>
-                            </div>
-
-                            {isEdit ? (
-                                <div className="mt-3 space-y-2">
-                                    {[
-                                        {k:'health',  label:'🏃 Health goals',  color:'focus:border-emerald-500'},
-                                        {k:'studies', label:'📚 Study goals',   color:'focus:border-blue-500'},
-                                        {k:'work',    label:'💼 Work goals',    color:'focus:border-violet-500'},
-                                        {k:'wealth',  label:'💰 Wealth goals',  color:'focus:border-green-500'},
-                                    ].map(f => (
-                                        <div key={f.k}>
-                                            <label className="text-xs font-medium text-slate-500 block mb-1">{f.label}</label>
-                                            <textarea rows="2" value={editNotes[f.k]||''}
-                                                onChange={e => setEditNotes(p=>({...p,[f.k]:e.target.value}))}
-                                                placeholder="Set a specific target for this month…"
-                                                className={`w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none resize-none ${f.color}`} />
-                                        </div>
-                                    ))}
-                                    <button onClick={saveEdit}
-                                        className="w-full py-2.5 bg-blue-600 text-white text-sm rounded-xl font-medium hover:bg-blue-700 transition">
-                                        Save Goals
+            <div className="bg-white rounded-2xl p-5 border border-slate-100">
+                <p className="font-semibold text-slate-800 mb-4">{title}</p>
+                <div className="space-y-2">
+                    {MONTHS.map(m=>{
+                        const note = data.monthlyNotes?.[m.key]?.[noteKey]||'';
+                        const isCur=m.key===cur, fut=m.key>cur, isEd=editKey===m.key;
+                        return (
+                            <div key={m.key} className={`rounded-xl border p-3 transition ${isCur?'border-blue-200 bg-blue-50':'border-slate-100'} ${fut?'opacity-30':''}`}>
+                                <div className="flex justify-between items-center">
+                                    <span className={`text-sm font-medium ${isCur?'text-blue-700':'text-slate-700'}`}>{m.label}{isCur?' ← now':''}</span>
+                                    <button onClick={()=>{if(isEd){setEditKey(null);}else{setEditText(note);setEditKey(m.key);}}}
+                                        className="text-xs text-blue-600 border border-blue-200 px-2 py-0.5 rounded-lg hover:bg-blue-50 transition">
+                                        {isEd?'Cancel':'Edit'}
                                     </button>
                                 </div>
-                            ) : hasNotes ? (
-                                <div className="mt-3 space-y-2">
-                                    {notes.health  && <NoteBlock label="Health"  text={notes.health}  c="text-emerald-600" />}
-                                    {notes.studies && <NoteBlock label="Studies" text={notes.studies} c="text-blue-600" />}
-                                    {notes.work    && <NoteBlock label="Work"    text={notes.work}    c="text-violet-600" />}
-                                    {notes.wealth  && <NoteBlock label="Wealth"  text={notes.wealth}  c="text-green-600" />}
-                                </div>
-                            ) : (
-                                <p className="text-sm text-slate-400 mt-2 italic">No goals set — click Edit to add.</p>
-                            )}
-                        </div>
-                    );
-                })}
-            </div>
-        );
-    }
-
-    function NoteBlock({ label, text, c }) {
-        return (
-            <div>
-                <span className={`text-xs font-semibold ${c}`}>{label}</span>
-                <p className="text-sm text-slate-600 mt-0.5 leading-relaxed">{text}</p>
+                                {isEd?(
+                                    <div className="mt-2 space-y-2">
+                                        <textarea rows="2" value={editText} onChange={e=>setEditText(e.target.value)}
+                                            placeholder="Your focus for this month…"
+                                            className={`w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none resize-none ${color}`}/>
+                                        <button onClick={()=>{
+                                            const existing=data.monthlyNotes?.[m.key]||{};
+                                            save({...data,monthlyNotes:{...(data.monthlyNotes||{}),[m.key]:{...existing,[noteKey]:editText}}});
+                                            setEditKey(null);
+                                        }} className="w-full py-2 bg-blue-600 text-white text-sm rounded-xl font-medium hover:bg-blue-700 transition">Save</button>
+                                    </div>
+                                ):note?(
+                                    <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">{note}</p>
+                                ):(
+                                    <p className="text-xs text-slate-400 mt-1 italic">No notes yet — click Edit to add.</p>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
         );
     }
