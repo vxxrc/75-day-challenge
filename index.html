@@ -23,7 +23,6 @@
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            /* safe area for iPhone notch / home bar */
             padding-top: env(safe-area-inset-top);
             padding-bottom: env(safe-area-inset-bottom);
         }
@@ -50,6 +49,7 @@
     const CHALLENGE_END   = '2026-08-31';
     const TOTAL_DAYS      = 189;
     const HYROX_DATE      = '2026-11-15';
+    const NW_GOAL         = 600000; // ₹6L
 
     function fmtDate(d) {
         return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -66,19 +66,42 @@
     }
     function daysBetween(a, b) { return Math.round((parseD(b) - parseD(a)) / 86400000); }
 
-    const emptyDay = () => ({ gym:false, running:false, greenTea:false, outsideFood:false, cheatMeal:false, weight:null, studyHours:0, workHours:0 });
-    const initData = () => ({ dailyLogs:{}, books:[], currentBookId:null, monthlyNotes:{} });
+    function fmtMoney(n, priv) {
+        if (priv) return '₹ ••••';
+        if (n >= 100000) return `₹${(n/100000).toFixed(2)}L`;
+        if (n >= 1000)   return `₹${(n/1000).toFixed(1)}k`;
+        return `₹${n.toLocaleString('en-IN')}`;
+    }
+    function fmtMoneyRaw(n, priv) {
+        if (priv) return '••••';
+        return `₹${n.toLocaleString('en-IN')}`;
+    }
+    function calcNW(entry) {
+        return (entry.demat||0) + (entry.crypto||0) + (entry.bank||0) - (entry.creditCard||0);
+    }
+
+    const emptyDay = () => ({
+        gym:false, running:false, greenTea:false, outsideFood:false, cheatMeal:false,
+        weight:null, studyHours:0, workHours:0, pagesRead:0, readingBookId:null
+    });
+    const initData = () => ({
+        dailyLogs:{}, books:[], currentBookId:null, monthlyNotes:{}, netWorthLogs:[]
+    });
 
     // ─── APP ──────────────────────────────────────────────────────────────────
     function App() {
-        const [view, setView] = useState('dashboard');
-        const [data, setData] = useState(null);
+        const [view, setView]       = useState('dashboard');
+        const [data, setData]       = useState(null);
+        const [privacy, setPrivacy] = useState(false);
         const today = fmtDate(new Date());
 
         useEffect(() => {
             try {
                 const saved = localStorage.getItem('6mc-v2');
-                setData(saved ? JSON.parse(saved) : initData());
+                const parsed = saved ? JSON.parse(saved) : initData();
+                // Ensure new fields exist on old data
+                if (!parsed.netWorthLogs) parsed.netWorthLogs = [];
+                setData(parsed);
             } catch { setData(initData()); }
         }, []);
 
@@ -97,10 +120,42 @@
             });
         }, []);
 
+        // Updates both daily reading log AND book's currentPage
+        const updateReading = useCallback((dateStr, bookId, pagesRead) => {
+            setData(prev => {
+                const todayLog  = prev.dailyLogs[dateStr] || emptyDay();
+                const oldPages  = todayLog.pagesRead  || 0;
+                const oldBookId = todayLog.readingBookId;
+                const bId       = bookId ? Number(bookId) : null;
+
+                const newBooks = prev.books.map(b => {
+                    if (b.id === oldBookId && b.id !== bId && oldPages > 0) {
+                        // Remove old pages from previous book
+                        return { ...b, currentPage: Math.max(0, b.currentPage - oldPages) };
+                    }
+                    if (b.id === bId) {
+                        const delta    = (b.id === oldBookId) ? (pagesRead - oldPages) : pagesRead;
+                        const newPage  = Math.min(b.totalPages, Math.max(0, b.currentPage + delta));
+                        const done     = newPage >= b.totalPages;
+                        return { ...b, currentPage: newPage,
+                            finishedDate: done && !b.finishedDate ? fmtDate(new Date()) : b.finishedDate };
+                    }
+                    return b;
+                });
+
+                const nd = {
+                    ...prev, books: newBooks,
+                    dailyLogs: { ...prev.dailyLogs,
+                        [dateStr]: { ...(prev.dailyLogs[dateStr] || emptyDay()), pagesRead, readingBookId: bId }
+                    }
+                };
+                localStorage.setItem('6mc-v2', JSON.stringify(nd));
+                return nd;
+            });
+        }, []);
+
         if (!data) return <div className="flex items-center justify-center h-screen text-slate-400 text-lg">Loading…</div>;
 
-        const todayD   = parseD(today);
-        const startD   = parseD(CHALLENGE_START);
         const rawDay   = daysBetween(CHALLENGE_START, today) + 1;
         const challDay = Math.max(0, Math.min(rawDay, TOTAL_DAYS));
         const started  = today >= CHALLENGE_START;
@@ -110,6 +165,7 @@
             { id:'today',     label:'📅 Today' },
             { id:'progress',  label:'📊 Progress' },
             { id:'reading',   label:'📖 Reading' },
+            { id:'wealth',    label:'💰 Wealth' },
             { id:'goals',     label:'🎯 Goals' },
         ];
 
@@ -124,8 +180,17 @@
                                 {started ? `Day ${challDay} of ${TOTAL_DAYS}` : `Starts ${CHALLENGE_START}`}
                             </p>
                         </div>
-                        <div className="text-right text-xs text-slate-400 mt-1">
-                            {new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}
+                        <div className="flex items-center gap-2 mt-1">
+                            <button onClick={() => setPrivacy(p => !p)}
+                                title={privacy ? 'Show numbers' : 'Hide numbers'}
+                                className={`text-xs flex items-center gap-1 px-3 py-1.5 rounded-xl transition font-medium ${
+                                    privacy ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                }`}>
+                                {privacy ? '👁 Show' : '🙈 Hide'}
+                            </button>
+                            <div className="text-right text-xs text-slate-400">
+                                {new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}
+                            </div>
                         </div>
                     </div>
                     <div className="max-w-7xl mx-auto px-6 flex gap-0 overflow-x-auto">
@@ -140,10 +205,11 @@
                 </div>
 
                 <div className="max-w-7xl mx-auto px-6 py-6 pb-16">
-                    {view==='dashboard' && <Dashboard data={data} today={today} challDay={challDay} />}
-                    {view==='today'     && <TodayLog  data={data} today={today} updateDay={updateDay} />}
+                    {view==='dashboard' && <Dashboard data={data} today={today} challDay={challDay} privacy={privacy} />}
+                    {view==='today'     && <TodayLog  data={data} today={today} updateDay={updateDay} updateReading={updateReading} />}
                     {view==='progress'  && <Progress  data={data} today={today} />}
                     {view==='reading'   && <Reading   data={data} save={persist} />}
+                    {view==='wealth'    && <Wealth    data={data} save={persist} privacy={privacy} />}
                     {view==='goals'     && <Goals     data={data} save={persist} today={today} />}
                 </div>
             </div>
@@ -151,7 +217,7 @@
     }
 
     // ─── DASHBOARD ────────────────────────────────────────────────────────────
-    function Dashboard({ data, today, challDay }) {
+    function Dashboard({ data, today, challDay, privacy }) {
         const logs = data.dailyLogs;
 
         // Weight
@@ -164,7 +230,7 @@
         const daysToHyrox = Math.max(0, daysBetween(today, HYROX_DATE));
 
         // This week
-        const ws   = getWeekStart(today);
+        const ws     = getWeekStart(today);
         const wDates = getWeekDates(ws);
         const wk = {
             gym:      wDates.filter(d => logs[d]?.gym).length,
@@ -176,16 +242,17 @@
             work:     wDates.reduce((s,d) => s + (parseFloat(logs[d]?.workHours)||0), 0),
         };
 
-        // Study goal days (met target)
+        // Study days
         const allLogDates = Object.keys(logs).filter(d => d >= CHALLENGE_START);
         const studyDays   = allLogDates.filter(d => {
             const h = parseFloat(logs[d]?.studyHours)||0;
             return isWeekend(d) ? h >= 5 : h >= 3;
         }).length;
 
-        // Current book
-        const curBook     = data.books.find(b => b.id === data.currentBookId);
+        // Reading stats
+        const curBook       = data.books.find(b => b.id === data.currentBookId);
         const booksFinished = data.books.filter(b => b.finishedDate).length;
+        const totalPagesRead = Object.values(logs).reduce((s,l) => s+(l.pagesRead||0), 0);
 
         // Study streak
         let streak = 0;
@@ -198,6 +265,12 @@
             else break;
         }
 
+        // Net worth
+        const nwLogs = [...(data.netWorthLogs||[])].sort((a,b) => a.date<b.date?-1:1);
+        const latestNW = nwLogs.length ? nwLogs[nwLogs.length-1] : null;
+        const nw       = latestNW ? calcNW(latestNW) : null;
+        const nwPct    = nw !== null ? Math.min(100,(nw/NW_GOAL)*100) : 0;
+
         const pct = Math.min(100, ((challDay / TOTAL_DAYS)*100)).toFixed(0);
 
         return (
@@ -206,7 +279,6 @@
                 <div>
                     <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Main Goals</p>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-
                         {/* ISB */}
                         <GoalCard color="bg-blue-600">
                             <div className="text-2xl">🎓</div>
@@ -250,7 +322,7 @@
                             ) : (
                                 <>
                                     <div className="text-3xl font-bold mt-1">{booksFinished}</div>
-                                    <div className="text-xs opacity-75">books finished</div>
+                                    <div className="text-xs opacity-75">books · {totalPagesRead} pages</div>
                                 </>
                             )}
                         </GoalCard>
@@ -266,7 +338,34 @@
                     </div>
                 </div>
 
-                {/* Challenge progress bar - full width */}
+                {/* Net Worth summary (shown if at least one entry exists) */}
+                {nw !== null && (
+                    <div className="bg-white rounded-2xl p-5 border border-slate-100">
+                        <div className="flex justify-between items-end mb-3">
+                            <div>
+                                <p className="font-semibold text-slate-800">💰 Net Worth</p>
+                                <p className="text-xs text-slate-400">Goal: ₹6L by Aug 2026 · Last: {latestNW.date}</p>
+                            </div>
+                            <div className="text-right">
+                                <span className="text-2xl font-bold text-green-600">{fmtMoney(nw, privacy)}</span>
+                                <p className="text-xs text-slate-400">{nwPct.toFixed(0)}% of ₹6L</p>
+                            </div>
+                        </div>
+                        <div className="bg-slate-100 rounded-full h-3">
+                            <div className="bg-green-500 rounded-full h-3 transition-all" style={{width:`${nwPct}%`}} />
+                        </div>
+                        {!privacy && latestNW && (
+                            <div className="grid grid-cols-4 gap-2 mt-3 text-xs text-center text-slate-500">
+                                <div><div className="font-semibold text-slate-700">{fmtMoney(latestNW.demat||0, privacy)}</div><div>Demat</div></div>
+                                <div><div className="font-semibold text-slate-700">{fmtMoney(latestNW.crypto||0, privacy)}</div><div>Crypto</div></div>
+                                <div><div className="font-semibold text-slate-700">{fmtMoney(latestNW.bank||0, privacy)}</div><div>Bank</div></div>
+                                <div><div className="font-semibold text-red-500">{fmtMoney(latestNW.creditCard||0, privacy)}</div><div>CC (debt)</div></div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Challenge progress bar */}
                 <div className="bg-white rounded-2xl p-5 border border-slate-100">
                     <div className="flex justify-between items-end mb-3">
                         <div>
@@ -285,7 +384,7 @@
 
                 {/* 2-column on desktop */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* This Week - takes 2/3 */}
+                    {/* This Week */}
                     <div className="md:col-span-2 bg-white rounded-2xl p-5 border border-slate-100">
                         <p className="font-semibold text-slate-800 mb-4">This Week</p>
                         <div className="space-y-3">
@@ -301,7 +400,7 @@
                         </div>
                     </div>
 
-                    {/* Right column - streak + quote */}
+                    {/* Right column */}
                     <div className="flex flex-col gap-4">
                         {streak > 0 ? (
                             <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5 flex items-center gap-3">
@@ -340,7 +439,7 @@
         );
     }
     function HBar({ label, val, max, color, unit='', dec=0 }) {
-        const pct = Math.min(100,(val/max)*100);
+        const pct  = Math.min(100,(val/max)*100);
         const done = val >= max;
         return (
             <div>
@@ -358,28 +457,51 @@
     }
 
     // ─── TODAY LOG ────────────────────────────────────────────────────────────
-    function TodayLog({ data, today, updateDay }) {
+    function TodayLog({ data, today, updateDay, updateReading }) {
         const log = data.dailyLogs[today] || emptyDay();
         const [studyInput, setStudyInput] = useState(log.studyHours || '');
         const [workInput,  setWorkInput]  = useState(log.workHours  || '');
         const [wInput,     setWInput]     = useState(log.weight     || '');
+        const [pagesInput, setPagesInput] = useState(log.pagesRead  || '');
+        const [readBookId, setReadBookId] = useState(String(log.readingBookId || ''));
 
-        // Keep inputs in sync if log changes externally
+        const activeBooks = data.books.filter(b => !b.finishedDate);
+
         useEffect(() => {
             setStudyInput(log.studyHours || '');
             setWorkInput(log.workHours   || '');
             setWInput(log.weight         || '');
+            setPagesInput(log.pagesRead  || '');
+            setReadBookId(String(log.readingBookId || ''));
         }, [today]);
+
+        // Set default book to current if none selected
+        useEffect(() => {
+            if (!readBookId && data.currentBookId) {
+                setReadBookId(String(data.currentBookId));
+            }
+        }, [data.currentBookId]);
 
         const toggle = f => updateDay(today, { [f]: !log[f] });
         const studyTarget = isWeekend(today) ? 5 : 3;
         const studyH = parseFloat(log.studyHours)||0;
         const workH  = parseFloat(log.workHours)||0;
 
+        const saveReading = () => {
+            const p = parseInt(pagesInput);
+            if (!readBookId || isNaN(p) || p <= 0) return;
+            updateReading(today, Number(readBookId), p);
+        };
+
+        const readingBook = log.readingBookId
+            ? data.books.find(b => b.id === log.readingBookId)
+            : null;
+
         const goalsMet = [
             log.gym, log.running, log.greenTea,
             !log.outsideFood || log.cheatMeal,
-            studyH >= studyTarget
+            studyH >= studyTarget,
+            (log.pagesRead||0) > 0
         ].filter(Boolean).length;
 
         const dayLabel = parseD(today).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
@@ -424,7 +546,7 @@
                         </div>
                     </LogSection>
 
-                    {/* RIGHT: Studies + Work + Score */}
+                    {/* RIGHT: Studies + Work + Reading + Score */}
                     <div className="space-y-4">
                         <LogSection title="📚 Studies — ISB Prep" accent="border-l-blue-500">
                             <div>
@@ -473,15 +595,51 @@
                             <p className="text-xs text-slate-400">No distractions — phone away, full focus sessions only</p>
                         </LogSection>
 
+                        {/* Reading today */}
+                        <LogSection title="📖 Reading Today" accent="border-l-amber-500">
+                            {activeBooks.length > 0 ? (
+                                <div className="space-y-2">
+                                    <select value={readBookId} onChange={e => setReadBookId(e.target.value)}
+                                        className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500 bg-white">
+                                        <option value="">Select book…</option>
+                                        {activeBooks.map(b => (
+                                            <option key={b.id} value={b.id}>{b.title}</option>
+                                        ))}
+                                    </select>
+                                    <div className="flex gap-2 items-center">
+                                        <input type="number" min="0" max="500"
+                                            value={pagesInput} onChange={e => setPagesInput(e.target.value)}
+                                            onKeyDown={e => e.key==='Enter' && saveReading()}
+                                            placeholder="Pages read today"
+                                            className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500"
+                                        />
+                                        <span className="text-sm text-slate-400">pages</span>
+                                        <button onClick={saveReading}
+                                            className="px-4 py-2.5 bg-amber-500 text-white text-sm rounded-xl font-medium hover:bg-amber-600 transition">
+                                            Save
+                                        </button>
+                                    </div>
+                                    {log.pagesRead > 0 && (
+                                        <p className="text-xs text-amber-600">
+                                            ✓ {log.pagesRead} pages logged{readingBook ? ` — ${readingBook.title}` : ''}
+                                        </p>
+                                    )}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-slate-400">No active books — add one in the Reading tab.</p>
+                            )}
+                            <p className="text-xs text-slate-400 pt-1">Build the habit — even 10 pages counts.</p>
+                        </LogSection>
+
                         {/* Day score */}
-                        <div className={`rounded-2xl p-5 text-center border ${goalsMet >= 4 ? 'bg-emerald-50 border-emerald-200' : goalsMet >= 2 ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
-                            <div className="text-4xl mb-2">{goalsMet >= 5 ? '🔥' : goalsMet >= 3 ? '💪' : '⏳'}</div>
-                            <p className={`text-xl font-bold ${goalsMet>=4?'text-emerald-700':goalsMet>=2?'text-amber-700':'text-slate-500'}`}>
-                                {goalsMet}/5
+                        <div className={`rounded-2xl p-5 text-center border ${goalsMet >= 5 ? 'bg-emerald-50 border-emerald-200' : goalsMet >= 3 ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
+                            <div className="text-4xl mb-2">{goalsMet >= 6 ? '🔥' : goalsMet >= 4 ? '💪' : '⏳'}</div>
+                            <p className={`text-xl font-bold ${goalsMet>=5?'text-emerald-700':goalsMet>=3?'text-amber-700':'text-slate-500'}`}>
+                                {goalsMet}/6
                             </p>
                             <p className="text-sm text-slate-500 mt-0.5">goals hit today</p>
                             <p className="text-xs text-slate-400 mt-1">
-                                {goalsMet===5 ? 'Perfect day. Absolutely elite.' : goalsMet>=3 ? 'Solid effort. Push further.' : 'Every bit counts. Keep moving.'}
+                                {goalsMet===6 ? 'Perfect day. Absolutely elite.' : goalsMet>=4 ? 'Solid effort. Push further.' : 'Every bit counts. Keep moving.'}
                             </p>
                         </div>
                     </div>
@@ -521,10 +679,8 @@
     function Progress({ data, today }) {
         const logs = data.dailyLogs;
 
-        // Weight entries for chart
         const wEntries = Object.entries(logs).filter(([_,l]) => l.weight).sort(([a],[b]) => a<b?-1:1);
 
-        // Last 14 days
         const last14 = Array.from({length:14}, (_,i) => {
             const d = parseD(today); d.setDate(d.getDate()-13+i);
             const ds = fmtDate(d);
@@ -532,10 +688,10 @@
             return { ds, label: d.toLocaleDateString('en-US',{weekday:'short', day:'numeric'}),
                 gym: l.gym||false, running: l.running||false, greenTea: l.greenTea||false,
                 study: parseFloat(l.studyHours)||0, work: parseFloat(l.workHours)||0,
-                weight: l.weight||null, outside: l.outsideFood||false };
+                weight: l.weight||null, outside: l.outsideFood||false,
+                pages: l.pagesRead||0 };
         });
 
-        // Monthly breakdown
         const months = [
             {key:'2026-02',label:'Feb (start)'},{key:'2026-03',label:'March'},{key:'2026-04',label:'April'},
             {key:'2026-05',label:'May'},{key:'2026-06',label:'June'},{key:'2026-07',label:'July'},{key:'2026-08',label:'August'}
@@ -549,6 +705,7 @@
                 tea:   ents.filter(([_,l])=>l.greenTea).length,
                 study: ents.reduce((s,[_,l])=>s+(parseFloat(l.studyHours)||0),0),
                 work:  ents.reduce((s,[_,l])=>s+(parseFloat(l.workHours)||0),0),
+                pages: ents.reduce((s,[_,l])=>s+(l.pagesRead||0),0),
             };
         };
 
@@ -558,9 +715,7 @@
                 <div className="bg-white rounded-2xl p-5 border border-slate-100">
                     <div className="flex justify-between items-center mb-1">
                         <p className="font-semibold text-slate-800">⚖️ Weight Progress</p>
-                        {wEntries.length > 0 && (
-                            <span className="text-xs text-slate-400">{wEntries.length} entries</span>
-                        )}
+                        {wEntries.length > 0 && <span className="text-xs text-slate-400">{wEntries.length} entries</span>}
                     </div>
                     <div className="flex gap-4 text-xs mb-4">
                         <span className="text-amber-600 font-medium">─ 78kg target (July)</span>
@@ -589,6 +744,7 @@
                                     <th className="pb-2 px-1">🍔</th>
                                     <th className="pb-2 px-1">📚h</th>
                                     <th className="pb-2 px-1">💼h</th>
+                                    <th className="pb-2 px-1">📖</th>
                                     <th className="pb-2 px-1">⚖️</th>
                                 </tr>
                             </thead>
@@ -602,6 +758,7 @@
                                         <td className="py-1.5 px-1 text-center">{d.outside?'❌':'·'}</td>
                                         <td className={`py-1.5 px-1 text-center ${d.study>0?'text-blue-600':''}`}>{d.study||'·'}</td>
                                         <td className={`py-1.5 px-1 text-center ${d.work>0?'text-violet-600':''}`}>{d.work||'·'}</td>
+                                        <td className={`py-1.5 px-1 text-center ${d.pages>0?'text-amber-600':''}`}>{d.pages||'·'}</td>
                                         <td className={`py-1.5 px-1 text-center ${d.weight?'text-emerald-600':''}`}>{d.weight||'·'}</td>
                                     </tr>
                                 ))}
@@ -615,8 +772,8 @@
                     <p className="font-semibold text-slate-800 mb-4">Monthly Breakdown</p>
                     <div className="space-y-3">
                         {months.map(m => {
-                            const s = mStats(m.key);
-                            const cur = today.startsWith(m.key);
+                            const s   = mStats(m.key);
+                            const cur  = today.startsWith(m.key);
                             const past = m.key < today.substring(0,7);
                             return (
                                 <div key={m.key} className={`p-3 rounded-xl transition ${cur?'bg-blue-50 border border-blue-200':past?'bg-slate-50':' bg-slate-50 opacity-40'}`}>
@@ -627,12 +784,13 @@
                                         <span className="text-xs text-slate-400">{s.days} days logged</span>
                                     </div>
                                     {s.days > 0 && (
-                                        <div className="grid grid-cols-5 gap-1 text-center text-xs">
+                                        <div className="grid grid-cols-6 gap-1 text-center text-xs">
                                             <Stat v={s.gym}   label="gym"   c="text-emerald-600" />
                                             <Stat v={s.run}   label="runs"  c="text-sky-600" />
                                             <Stat v={s.tea}   label="🍵"    c="text-teal-600" />
                                             <Stat v={`${s.study.toFixed(0)}h`} label="study" c="text-blue-600" />
                                             <Stat v={`${s.work.toFixed(0)}h`}  label="work"  c="text-violet-600" />
+                                            <Stat v={`${s.pages}p`}           label="read"  c="text-amber-600" />
                                         </div>
                                     )}
                                 </div>
@@ -713,6 +871,16 @@
         const active   = data.books.filter(b => !b.finishedDate);
         const finished = data.books.filter(b =>  b.finishedDate);
 
+        // Reading history from daily logs
+        const readingHistory = Object.entries(data.dailyLogs)
+            .filter(([_, l]) => (l.pagesRead||0) > 0)
+            .sort(([a],[b]) => b < a ? -1 : 1) // most recent first
+            .slice(0, 20);
+
+        const totalPagesRead = Object.values(data.dailyLogs).reduce((s,l) => s+(l.pagesRead||0), 0);
+        const readingDays    = Object.values(data.dailyLogs).filter(l => (l.pagesRead||0) > 0).length;
+        const avgPages       = readingDays > 0 ? (totalPagesRead / readingDays).toFixed(0) : 0;
+
         return (
             <div className="space-y-4">
                 <div className="flex justify-between items-center">
@@ -722,6 +890,24 @@
                         + Add Book
                     </button>
                 </div>
+
+                {/* Reading stats summary */}
+                {totalPagesRead > 0 && (
+                    <div className="grid grid-cols-3 gap-3">
+                        <div className="bg-amber-50 rounded-2xl p-4 text-center border border-amber-100">
+                            <div className="text-2xl font-bold text-amber-700">{totalPagesRead}</div>
+                            <div className="text-xs text-amber-600 mt-0.5">total pages</div>
+                        </div>
+                        <div className="bg-amber-50 rounded-2xl p-4 text-center border border-amber-100">
+                            <div className="text-2xl font-bold text-amber-700">{readingDays}</div>
+                            <div className="text-xs text-amber-600 mt-0.5">days read</div>
+                        </div>
+                        <div className="bg-amber-50 rounded-2xl p-4 text-center border border-amber-100">
+                            <div className="text-2xl font-bold text-amber-700">{avgPages}</div>
+                            <div className="text-xs text-amber-600 mt-0.5">avg pages/day</div>
+                        </div>
+                    </div>
+                )}
 
                 {showAdd && (
                     <div className="bg-white rounded-2xl p-5 border border-amber-200 border-l-4 border-l-amber-500">
@@ -745,12 +931,16 @@
                 {active.map(book => {
                     const pct = book.totalPages > 0 ? (book.currentPage/book.totalPages*100) : 0;
                     const cur = book.id === data.currentBookId;
+                    // Pages from daily logs for this book
+                    const bookPages = Object.values(data.dailyLogs)
+                        .filter(l => l.readingBookId === book.id)
+                        .reduce((s,l) => s+(l.pagesRead||0), 0);
                     return (
                         <div key={book.id} className={`bg-white rounded-2xl p-5 border ${cur?'border-amber-300 border-l-4 border-l-amber-500':'border-slate-100'}`}>
                             <div className="flex justify-between items-start mb-3">
                                 <div className="flex-1 pr-3">
                                     <h4 className="font-semibold text-slate-800">{book.title}</h4>
-                                    <p className="text-xs text-slate-400 mt-0.5">Started {book.startDate}</p>
+                                    <p className="text-xs text-slate-400 mt-0.5">Started {book.startDate}{bookPages > 0 ? ` · ${bookPages} pages logged via daily log` : ''}</p>
                                 </div>
                                 {cur
                                     ? <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-lg font-medium">Reading now</span>
@@ -779,16 +969,39 @@
                                     value={pageInputs[book.id]||''}
                                     onChange={e => setPageInputs(p=>({...p,[book.id]:e.target.value}))}
                                     onKeyDown={e => e.key==='Enter' && updatePage(book.id)}
-                                    placeholder={`Update page (now: ${book.currentPage})`}
+                                    placeholder={`Set page directly (now: ${book.currentPage})`}
                                     className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500" />
                                 <button onClick={() => updatePage(book.id)}
                                     className="px-4 py-2.5 bg-amber-500 text-white text-sm rounded-xl font-medium hover:bg-amber-600 transition">
-                                    Update
+                                    Set
                                 </button>
                             </div>
+                            <p className="text-xs text-slate-400 mt-1.5">Tip: log pages in Today tab to auto-update progress.</p>
                         </div>
                     );
                 })}
+
+                {/* Daily reading history */}
+                {readingHistory.length > 0 && (
+                    <div className="bg-white rounded-2xl p-5 border border-slate-100">
+                        <p className="font-semibold text-slate-800 mb-3">📅 Reading Log</p>
+                        <div className="space-y-1.5">
+                            {readingHistory.map(([date, log]) => {
+                                const book = data.books.find(b => b.id === log.readingBookId);
+                                const d    = parseD(date);
+                                return (
+                                    <div key={date} className="flex items-center gap-3 py-1.5 border-b border-slate-50 last:border-0">
+                                        <span className="text-xs text-slate-400 w-20 flex-shrink-0">
+                                            {d.toLocaleDateString('en-US',{month:'short',day:'numeric'})}
+                                        </span>
+                                        <span className="text-sm font-semibold text-amber-600">{log.pagesRead} pages</span>
+                                        <span className="text-xs text-slate-500 truncate">{book?.title || '—'}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
 
                 {/* Finished */}
                 {finished.length > 0 && (
@@ -817,6 +1030,299 @@
                 )}
             </div>
         );
+    }
+
+    // ─── WEALTH ───────────────────────────────────────────────────────────────
+    function Wealth({ data, save, privacy }) {
+        const logs = [...(data.netWorthLogs||[])].sort((a,b) => a.date<b.date?-1:1);
+        const [showForm, setShowForm] = useState(false);
+        const [form, setForm] = useState({
+            date: fmtDate(new Date()), demat:'', crypto:'', bank:'', creditCard:''
+        });
+        const [editDate, setEditDate] = useState(null);
+
+        const latest = logs.length ? logs[logs.length-1] : null;
+        const nw     = latest ? calcNW(latest) : null;
+        const nwPct  = nw !== null ? Math.min(100,(nw/NW_GOAL)*100) : 0;
+
+        // Previous entry for delta
+        const prev   = logs.length > 1 ? logs[logs.length-2] : null;
+        const prevNW = prev ? calcNW(prev) : null;
+        const delta  = nw !== null && prevNW !== null ? nw - prevNW : null;
+
+        const setF = (k, v) => setForm(f => ({...f, [k]:v}));
+
+        const startAdd = () => {
+            setForm({ date: fmtDate(new Date()), demat:'', crypto:'', bank:'', creditCard:'' });
+            setEditDate(null);
+            setShowForm(true);
+        };
+
+        const startEdit = (entry) => {
+            setForm({
+                date: entry.date,
+                demat:      String(entry.demat      || ''),
+                crypto:     String(entry.crypto     || ''),
+                bank:       String(entry.bank       || ''),
+                creditCard: String(entry.creditCard || ''),
+            });
+            setEditDate(entry.date);
+            setShowForm(true);
+        };
+
+        const saveEntry = () => {
+            const entry = {
+                date:       form.date,
+                demat:      parseFloat(form.demat)      || 0,
+                crypto:     parseFloat(form.crypto)     || 0,
+                bank:       parseFloat(form.bank)       || 0,
+                creditCard: parseFloat(form.creditCard) || 0,
+            };
+            // Replace existing same-date entry
+            const existing = (data.netWorthLogs||[]).filter(l => l.date !== entry.date);
+            save({ ...data, netWorthLogs: [...existing, entry] });
+            setShowForm(false);
+            setEditDate(null);
+        };
+
+        const deleteEntry = (date) => {
+            save({ ...data, netWorthLogs: (data.netWorthLogs||[]).filter(l => l.date !== date) });
+        };
+
+        const formNW = (parseFloat(form.demat)||0) + (parseFloat(form.crypto)||0) +
+                       (parseFloat(form.bank)||0)  - (parseFloat(form.creditCard)||0);
+
+        return (
+            <div className="space-y-5">
+                <div className="flex justify-between items-center">
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-800">💰 Net Worth</h2>
+                        <p className="text-sm text-slate-400 mt-0.5">Goal: ₹6L by Aug 31, 2026</p>
+                    </div>
+                    <button onClick={startAdd}
+                        className="px-4 py-2 bg-green-600 text-white text-sm rounded-xl font-medium hover:bg-green-700 transition">
+                        + Log Entry
+                    </button>
+                </div>
+
+                {/* Current NW card */}
+                {nw !== null && (
+                    <div className="bg-gradient-to-br from-green-600 to-emerald-700 text-white rounded-2xl p-6">
+                        <p className="text-sm opacity-75 mb-1">Current Net Worth</p>
+                        <p className="text-5xl font-bold">{fmtMoney(nw, privacy)}</p>
+                        {delta !== null && !privacy && (
+                            <p className={`text-sm mt-1 ${delta >= 0 ? 'opacity-90' : 'text-red-200'}`}>
+                                {delta >= 0 ? '↑' : '↓'} {fmtMoney(Math.abs(delta), false)} since last entry
+                            </p>
+                        )}
+                        <div className="mt-4">
+                            <div className="flex justify-between text-xs opacity-75 mb-1">
+                                <span>{nwPct.toFixed(0)}% of ₹6L goal</span>
+                                <span>{fmtMoney(Math.max(0, NW_GOAL - (nw||0)), privacy)} to go</span>
+                            </div>
+                            <div className="bg-white/20 rounded-full h-2.5">
+                                <div className="bg-white rounded-full h-2.5 transition-all" style={{width:`${nwPct}%`}} />
+                            </div>
+                        </div>
+                        <p className="text-xs opacity-50 mt-3">Last updated: {latest.date}</p>
+                    </div>
+                )}
+
+                {/* Breakdown of latest entry */}
+                {latest && (
+                    <div className="bg-white rounded-2xl p-5 border border-slate-100">
+                        <p className="font-semibold text-slate-800 mb-4">Breakdown — {latest.date}</p>
+                        <div className="space-y-3">
+                            <NWBar label="📈 Demat (stocks + MFs)" val={latest.demat||0}   color="bg-blue-500"    privacy={privacy} total={nw} />
+                            <NWBar label="🔶 Crypto"               val={latest.crypto||0}  color="bg-orange-500"  privacy={privacy} total={nw} />
+                            <NWBar label="🏦 Bank balance"          val={latest.bank||0}    color="bg-emerald-500" privacy={privacy} total={nw} />
+                            <div className="border-t border-slate-100 pt-3">
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-slate-600">💳 Credit card (liability)</span>
+                                    <span className={`font-semibold ${privacy ? 'text-slate-400' : 'text-red-500'}`}>
+                                        {privacy ? '••••' : `- ${fmtMoney(latest.creditCard||0, false)}`}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* NW chart */}
+                {logs.length >= 2 && (
+                    <div className="bg-white rounded-2xl p-5 border border-slate-100">
+                        <p className="font-semibold text-slate-800 mb-1">Net Worth Over Time</p>
+                        <div className="text-xs text-green-600 font-medium mb-4">─ Target ₹6L</div>
+                        <NWChart logs={logs} privacy={privacy} />
+                    </div>
+                )}
+
+                {/* Log form */}
+                {showForm && (
+                    <div className="bg-white rounded-2xl p-5 border border-green-200 border-l-4 border-l-green-500">
+                        <h3 className="font-semibold text-slate-800 mb-4">
+                            {editDate ? `Edit Entry — ${editDate}` : 'Log Net Worth'}
+                        </h3>
+                        <div className="space-y-3">
+                            <div>
+                                <label className="text-xs font-medium text-slate-500 block mb-1">Date</label>
+                                <input type="date" value={form.date} onChange={e => setF('date', e.target.value)}
+                                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-500" />
+                            </div>
+                            {[
+                                { k:'demat',      label:'📈 Demat (stocks + mutual funds)', placeholder:'e.g. 150000', color:'focus:border-blue-500' },
+                                { k:'crypto',     label:'🔶 Crypto',                         placeholder:'e.g. 50000',  color:'focus:border-orange-500' },
+                                { k:'bank',       label:'🏦 Bank balance',                   placeholder:'e.g. 80000',  color:'focus:border-emerald-500' },
+                                { k:'creditCard', label:'💳 Credit card outstanding',         placeholder:'e.g. 20000',  color:'focus:border-red-400' },
+                            ].map(f => (
+                                <div key={f.k}>
+                                    <label className="text-xs font-medium text-slate-500 block mb-1">{f.label}</label>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm text-slate-400 flex-shrink-0">₹</span>
+                                        <input type="number" min="0" value={form[f.k]} onChange={e => setF(f.k, e.target.value)}
+                                            placeholder={f.placeholder}
+                                            className={`flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none ${f.color}`} />
+                                    </div>
+                                </div>
+                            ))}
+
+                            {/* Live NW preview */}
+                            <div className={`rounded-xl p-3 text-center ${formNW >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
+                                <p className="text-xs text-slate-500">Net Worth Preview</p>
+                                <p className={`text-xl font-bold mt-0.5 ${formNW >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+                                    {fmtMoney(formNW, false)}
+                                </p>
+                                <p className="text-xs text-slate-400 mt-0.5">
+                                    {((formNW/NW_GOAL)*100).toFixed(1)}% of ₹6L goal
+                                </p>
+                            </div>
+
+                            <div className="flex gap-2">
+                                <button onClick={saveEntry}
+                                    className="flex-1 py-2.5 bg-green-600 text-white text-sm rounded-xl font-medium hover:bg-green-700 transition">
+                                    Save Entry
+                                </button>
+                                <button onClick={() => { setShowForm(false); setEditDate(null); }}
+                                    className="px-4 py-2.5 bg-slate-100 text-slate-600 text-sm rounded-xl hover:bg-slate-200 transition">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* History */}
+                {logs.length > 0 && (
+                    <div className="bg-white rounded-2xl p-5 border border-slate-100">
+                        <p className="font-semibold text-slate-800 mb-4">All Entries</p>
+                        <div className="space-y-2">
+                            {[...logs].reverse().map((entry, idx) => {
+                                const enw  = calcNW(entry);
+                                const prev = logs[logs.length - 2 - idx];
+                                const pd   = prev ? calcNW(prev) : null;
+                                const d    = pd !== null ? enw - pd : null;
+                                return (
+                                    <div key={entry.date} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-semibold text-slate-700">{entry.date}</span>
+                                                {d !== null && !privacy && (
+                                                    <span className={`text-xs font-medium ${d >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                                        {d >= 0 ? '+' : ''}{fmtMoney(d, false)}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {!privacy && (
+                                                <div className="text-xs text-slate-400 mt-0.5">
+                                                    D:{fmtMoney(entry.demat||0,false)} · C:{fmtMoney(entry.crypto||0,false)} · B:{fmtMoney(entry.bank||0,false)} · CC:-{fmtMoney(entry.creditCard||0,false)}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="text-right flex-shrink-0">
+                                            <div className={`font-bold text-sm ${privacy ? 'text-slate-400' : 'text-green-700'}`}>
+                                                {fmtMoney(enw, privacy)}
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-1">
+                                            <button onClick={() => startEdit(entry)}
+                                                className="text-xs text-blue-500 border border-blue-200 px-2 py-1 rounded-lg hover:bg-blue-50 transition">
+                                                Edit
+                                            </button>
+                                            <button onClick={() => deleteEntry(entry.date)}
+                                                className="text-xs text-red-400 border border-red-200 px-2 py-1 rounded-lg hover:bg-red-50 transition">
+                                                ✕
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                {logs.length === 0 && !showForm && (
+                    <div className="text-center py-16 text-slate-400">
+                        <div className="text-5xl mb-3">💰</div>
+                        <p className="font-medium">No entries yet</p>
+                        <p className="text-sm mt-1">Log your first net worth snapshot to start tracking.</p>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    function NWBar({ label, val, color, privacy, total }) {
+        const pct = total > 0 ? Math.min(100, (val / total) * 100) : 0;
+        return (
+            <div>
+                <div className="flex justify-between text-sm mb-1">
+                    <span className="text-slate-600">{label}</span>
+                    <span className="font-semibold text-slate-700">{privacy ? '••••' : fmtMoney(val, false)}</span>
+                </div>
+                <div className="bg-slate-100 rounded-full h-2">
+                    <div className={`${color} rounded-full h-2 transition-all`} style={{width:`${pct}%`}} />
+                </div>
+            </div>
+        );
+    }
+
+    function NWChart({ logs, privacy }) {
+        const ref = useRef(null);
+        const ch  = useRef(null);
+        useEffect(() => {
+            if (!ref.current) return;
+            if (ch.current) ch.current.destroy();
+            const labels = logs.map(e => parseD(e.date).toLocaleDateString('en-US',{month:'short',day:'numeric'}));
+            const nwVals = logs.map(e => calcNW(e));
+            const mn = Math.max(0, Math.min(...nwVals) - 50000);
+            ch.current = new Chart(ref.current, {
+                type:'line',
+                data:{ labels, datasets:[
+                    { label:'Net Worth', data: privacy ? nwVals.map(() => null) : nwVals,
+                      borderColor:'#16a34a', backgroundColor:'rgba(22,163,74,0.08)',
+                      tension:0.4, fill:true, pointRadius:4, pointBackgroundColor:'#16a34a' },
+                    { label:'₹6L Goal', data:Array(labels.length).fill(NW_GOAL),
+                      borderColor:'#f59e0b', borderDash:[6,3], pointRadius:0, fill:false },
+                ]},
+                options:{ responsive:true,
+                    plugins:{ legend:{display:false}, tooltip:{
+                        callbacks:{ label: ctx => `₹${ctx.raw?.toLocaleString('en-IN')||''}` }
+                    }},
+                    scales:{
+                        y:{ min:mn, grid:{color:'#f1f5f9'},
+                            ticks:{ callback: v => v>=100000?`₹${(v/100000).toFixed(1)}L`:`₹${(v/1000).toFixed(0)}k` } },
+                        x:{ grid:{display:false}, ticks:{maxRotation:0, maxTicksLimit:8} }
+                    }
+                }
+            });
+            return () => ch.current?.destroy();
+        }, [logs, privacy]);
+        if (privacy) return (
+            <div className="py-10 text-center text-slate-400 text-sm">
+                Numbers hidden — toggle visibility to see chart.
+            </div>
+        );
+        return <canvas ref={ref} height="180" />;
     }
 
     // ─── GOALS ────────────────────────────────────────────────────────────────
@@ -863,7 +1369,8 @@
                             { icon:'🍱', label:'No outside food', target:'6 days out of 7  ·  1 cheat meal allowed' },
                             { icon:'📚', label:'Study — ISB prep', target:'3h weekdays  ·  5h weekends  (≥21h/week)' },
                             { icon:'💼', label:'Focused work', target:'Log daily — aim for 8h deep work' },
-                            { icon:'📖', label:'Reading', target:'Read daily, log pages, finish books' },
+                            { icon:'📖', label:'Reading', target:'Log pages daily in Today tab — build the habit' },
+                            { icon:'💰', label:'Net worth', target:'Log monthly snapshot — aim for ₹6L by Aug 2026' },
                         ].map(r => (
                             <div key={r.label} className="flex items-start gap-3">
                                 <span className="text-lg mt-0.5 w-6 flex-shrink-0">{r.icon}</span>
@@ -878,13 +1385,14 @@
 
                 {/* Main goals */}
                 <div className="bg-white rounded-2xl p-5 border border-slate-100">
-                    <p className="font-semibold text-slate-800 mb-4">🎯 The 4 Big Goals</p>
+                    <p className="font-semibold text-slate-800 mb-4">🎯 The 5 Big Goals</p>
                     <div className="space-y-3">
                         {[
                             { c:'bg-blue-600',   label:'Get into ISB 2026', desc:'GMAT, profile, essays, applications — give it everything.' },
                             { c:'bg-emerald-600', label:'78 kg by July, 81-82 kg for Hyrox', desc:'Cut to 78 by July. Then lean bulk to Hyrox performance weight.' },
-                            { c:'bg-amber-500',   label:'Inculcate reading as a habit', desc:'Read consistently. At least one book per month. Build the discipline.' },
+                            { c:'bg-amber-500',   label:'Inculcate reading as a habit', desc:'Read consistently. Log pages daily. At least one book per month.' },
                             { c:'bg-violet-600',  label:'Work professionally — keep it a priority', desc:'Show up fully. Log deep work. Treat it with the same seriousness as studies.' },
+                            { c:'bg-green-600',   label:'Reach ₹6L net worth by Aug 2026', desc:'Track demat, crypto, bank, and credit card monthly. Watch the number grow.' },
                         ].map(g => (
                             <div key={g.label} className="flex items-start gap-3">
                                 <div className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${g.c}`} />
