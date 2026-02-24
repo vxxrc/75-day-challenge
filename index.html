@@ -123,7 +123,7 @@
         return `₹${n.toLocaleString('en-IN')}`;
     }
     const calcNW = e => (e.demat||0)+(e.crypto||0)+(e.bank||0)-(e.creditCard||0);
-    const emptyDay = () => ({ gym:false,running:false,greenTea:false,outsideFood:false,cheatMeal:false,weight:null,studyHours:0,workHours:0,pagesRead:0,readingBookId:null,screenTime:0 });
+    const emptyDay = () => ({ gym:false,running:false,greenTea:false,outsideFood:false,cheatMeal:false,weight:null,studyHours:0,workHours:0,pagesRead:0,readingBookId:null,screenTime:0,runKm:0,runSpeed:0 });
     const initData = () => ({ dailyLogs:{},books:[],currentBookId:null,monthlyNotes:{},netWorthLogs:[] });
 
     function mergeData(local, cloud) {
@@ -490,6 +490,8 @@
         const [pagesInput,  setPagesInput]  = useState(log.pagesRead  ||'');
         const [readBookId,  setReadBookId]  = useState(String(log.readingBookId||''));
         const [screenInput, setScreenInput] = useState(log.screenTime ||'');
+        const [runKmInput,  setRunKmInput]  = useState(log.runKm      ||'');
+        const [runSpeedInput, setRunSpeedInput] = useState(log.runSpeed||'');
         const activeBooks = data.books.filter(b=>!b.finishedDate);
 
         useEffect(() => {
@@ -499,6 +501,8 @@
             setPagesInput(log.pagesRead  ||'');
             setReadBookId(String(log.readingBookId||''));
             setScreenInput(log.screenTime||'');
+            setRunKmInput(log.runKm      ||'');
+            setRunSpeedInput(log.runSpeed||'');
         }, [today]);
 
         useEffect(() => {
@@ -536,6 +540,23 @@
                         <Section title="🏃 Health Habits" accent="border-l-emerald-500">
                             <Toggle checked={log.gym}      onChange={()=>toggle('gym')}      label="Gym"         sub="Strength session" />
                             <Toggle checked={log.running}  onChange={()=>toggle('running')}  label="Running"     sub="Outdoor / cardio" />
+                            {log.running && (
+                                <div className="ml-1 pl-3 border-l-2 border-sky-300 space-y-2">
+                                    <div className="flex gap-2 items-center">
+                                        <input type="number" step="0.1" min="0" max="100" value={runKmInput} onChange={e=>setRunKmInput(e.target.value)}
+                                            placeholder="0.0" className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-sky-400"/>
+                                        <span className="text-sm text-slate-400 w-6">km</span>
+                                    </div>
+                                    <div className="flex gap-2 items-center">
+                                        <input type="number" step="0.1" min="0" max="30" value={runSpeedInput} onChange={e=>setRunSpeedInput(e.target.value)}
+                                            placeholder="0.0" className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-sky-400"/>
+                                        <span className="text-sm text-slate-400 w-14">km/h avg</span>
+                                    </div>
+                                    <button onClick={()=>{const km=parseFloat(runKmInput),sp=parseFloat(runSpeedInput);if(!isNaN(km)&&km>0)updateDay(today,{runKm:km,runSpeed:isNaN(sp)?0:sp});}}
+                                        className="w-full py-2 bg-sky-500 text-white text-sm rounded-xl font-medium hover:bg-sky-600 transition">Save run</button>
+                                    {(log.runKm>0) && <p className="text-xs text-sky-600">{log.runKm} km logged{log.runSpeed>0?` · ${log.runSpeed} km/h`:''}</p>}
+                                </div>
+                            )}
                             <Toggle checked={log.greenTea} onChange={()=>toggle('greenTea')} label="Green Tea"   sub="Had green tea today" />
                             <div className="grid grid-cols-2 gap-2 pt-1">
                                 <Toggle checked={!log.outsideFood} onChange={()=>toggle('outsideFood')} label="No outside food" sub="Home food only" />
@@ -743,10 +764,16 @@
 
         const gymWk       = wDates.filter(d=>logs[d]?.gym).length;
         const runWk       = wDates.filter(d=>logs[d]?.running).length;
+        const runKmWk     = wDates.reduce((s,d)=>s+(parseFloat(logs[d]?.runKm)||0),0);
+        const runSpeedWk  = (() => { const runs=wDates.filter(d=>(parseFloat(logs[d]?.runSpeed)||0)>0); return runs.length ? runs.reduce((s,d)=>s+(parseFloat(logs[d].runSpeed)||0),0)/runs.length : 0; })();
         const teaWk       = wDates.filter(d=>logs[d]?.greenTea).length;
         const outsWk      = wDates.filter(d=>logs[d]?.outsideFood).length;
         const screenOkWk  = wDates.filter(d=>{const h=parseFloat(logs[d]?.screenTime)||0;const goal=isWeekend(d)?4:3;return h>0&&h<=goal;}).length;
         const screenLogWk = wDates.filter(d=>(parseFloat(logs[d]?.screenTime)||0)>0).length;
+
+        // Monthly run stats
+        const curMonth = today.substring(0,7);
+        const runKmMonth = Object.entries(logs).filter(([d])=>d.startsWith(curMonth)).reduce((s,[,l])=>s+(parseFloat(l.runKm)||0),0);
 
         // Last 30 days calendar
         const last30 = Array.from({length:30},(_,i)=>{
@@ -785,6 +812,8 @@
                     <div className="space-y-3">
                         <HBar label="🏋️ Gym"       val={gymWk}      max={4} color="bg-emerald-500" />
                         <HBar label="🏃 Running"    val={runWk}      max={4} color="bg-sky-500" />
+                        {runKmWk > 0 && <div className="flex justify-between text-xs text-slate-500 -mt-1 px-1"><span>📍 {runKmWk.toFixed(1)} km this week</span>{runSpeedWk>0&&<span>⚡ avg {runSpeedWk.toFixed(1)} km/h</span>}</div>}
+                        {runKmMonth > 0 && <div className="text-xs text-sky-600 px-1">🗓 {runKmMonth.toFixed(1)} km this month</div>}
                         <HBar label="🍵 Green Tea"  val={teaWk}      max={5} color="bg-teal-500" />
                         <HBar label="📱 Screen ≤ goal" val={screenOkWk} max={7} color="bg-slate-500" />
                     </div>
