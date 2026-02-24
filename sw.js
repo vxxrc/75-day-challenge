@@ -1,4 +1,4 @@
-const CACHE = '6mc-v5';
+const CACHE = '6mc-v6';
 
 const ASSETS = [
     './',
@@ -10,6 +10,8 @@ const ASSETS = [
     'https://unpkg.com/@babel/standalone/babel.min.js',
     'https://cdn.tailwindcss.com',
     'https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js',
+    'https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js',
+    'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js',
 ];
 
 // Install: cache all assets

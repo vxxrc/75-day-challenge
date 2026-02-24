@@ -15,6 +15,8 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
         input[type=number]::-webkit-inner-spin-button { opacity: 1; }
@@ -23,6 +25,31 @@
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
         }
+        const firebaseConfig = {
+            apiKey: "AIzaSyC5OgqzgIJ6vCGuIiOnu5EjqMOusO2Abu4",
+            authDomain: "life---all-in-one-app.firebaseapp.com",
+            projectId: "life---all-in-one-app",
+            storageBucket: "life---all-in-one-app.firebasestorage.app",
+            messagingSenderId: "487066259508",
+            appId: "1:487066259508:web:9a72006b845e6524c0ba61"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const _db = firebase.firestore();
+        let _syncTimer = null;
+        window._cloudSave = function(userId, data) {
+            if (window._setSyncStatus) window._setSyncStatus('syncing');
+            clearTimeout(_syncTimer);
+            _syncTimer = setTimeout(function() {
+                _db.collection('users').doc(userId).set(JSON.parse(JSON.stringify(data)))
+                    .then(function() { if (window._setSyncStatus) window._setSyncStatus('synced'); })
+                    .catch(function() { if (window._setSyncStatus) window._setSyncStatus('offline'); });
+            }, 1500);
+        };
+        window._cloudLoad = function(userId) {
+            return _db.collection('users').doc(userId).get()
+                .then(function(doc) { return doc.exists ? doc.data() : null; })
+                .catch(function() { return null; });
+        };
     </script>
 </head>
 <body class="bg-slate-50">
@@ -67,25 +94,80 @@
     const emptyDay = () => ({ gym:false,running:false,greenTea:false,outsideFood:false,cheatMeal:false,weight:null,studyHours:0,workHours:0,pagesRead:0,readingBookId:null,screenTime:0 });
     const initData = () => ({ dailyLogs:{},books:[],currentBookId:null,monthlyNotes:{},netWorthLogs:[] });
 
+    function mergeData(local, cloud) {
+        const allDates = new Set([...Object.keys(local.dailyLogs||{}), ...Object.keys(cloud.dailyLogs||{})]);
+        const dailyLogs = {};
+        allDates.forEach(d => { dailyLogs[d] = {...(local.dailyLogs?.[d]||{}), ...(cloud.dailyLogs?.[d]||{})}; });
+        return {...local, ...cloud, dailyLogs};
+    }
+
     // ── APP ───────────────────────────────────────────────────────────────────
     function App() {
-        const [view, setView]       = useState('home');
-        const [data, setData]       = useState(null);
-        const [privacy, setPrivacy] = useState(false);
+        const [view, setView]             = useState('home');
+        const [data, setData]             = useState(null);
+        const [privacy, setPrivacy]       = useState(false);
+        const [syncStatus, setSyncStatus] = useState('loading');
+        const [showSetup, setShowSetup]   = useState(false);
+        const [passInput, setPassInput]   = useState('');
+        const [setupErr, setSetupErr]     = useState('');
+        const userIdRef = useRef(localStorage.getItem('pp-sync-id') || '');
         const today = fmtDate(new Date());
 
         useEffect(() => {
-            try {
-                const s = localStorage.getItem('6mc-v2');
-                const p = s ? JSON.parse(s) : initData();
-                if (!p.netWorthLogs) p.netWorthLogs = [];
-                setData(p);
-            } catch { setData(initData()); }
+            window._setSyncStatus = setSyncStatus;
+            return () => { window._setSyncStatus = null; };
         }, []);
+
+        useEffect(() => {
+            async function load() {
+                let local;
+                try { const s = localStorage.getItem('6mc-v2'); local = s ? JSON.parse(s) : initData(); }
+                catch { local = initData(); }
+                if (!local.netWorthLogs) local.netWorthLogs = [];
+                const uid = localStorage.getItem('pp-sync-id');
+                if (uid) {
+                    userIdRef.current = uid;
+                    setSyncStatus('syncing');
+                    const cloud = await window._cloudLoad(uid);
+                    if (cloud) {
+                        const merged = mergeData(local, cloud);
+                        if (!merged.netWorthLogs) merged.netWorthLogs = [];
+                        localStorage.setItem('6mc-v2', JSON.stringify(merged));
+                        setData(merged);
+                    } else {
+                        setData(local);
+                        window._cloudSave(uid, local);
+                    }
+                    setSyncStatus('synced');
+                } else {
+                    setData(local);
+                    setSyncStatus('idle');
+                    setShowSetup(true);
+                }
+            }
+            load();
+        }, []);
+
+        const doSetup = async () => {
+            const id = passInput.trim().toLowerCase().replace(/\s+/g, '-');
+            if (id.length < 4) { setSetupErr('Enter at least 4 characters'); return; }
+            localStorage.setItem('pp-sync-id', id);
+            userIdRef.current = id;
+            setShowSetup(false);
+            setSyncStatus('syncing');
+            const cloud = await window._cloudLoad(id);
+            const local = data || initData();
+            const merged = cloud ? mergeData(local, cloud) : local;
+            if (!merged.netWorthLogs) merged.netWorthLogs = [];
+            localStorage.setItem('6mc-v2', JSON.stringify(merged));
+            setData(merged);
+            window._cloudSave(id, merged);
+        };
 
         const persist = useCallback(nd => {
             setData(nd);
             localStorage.setItem('6mc-v2', JSON.stringify(nd));
+            if (userIdRef.current) window._cloudSave(userIdRef.current, nd);
         }, []);
 
         const updateDay = useCallback((dateStr, updates) => {
@@ -94,6 +176,7 @@
                     [dateStr]: { ...(prev.dailyLogs[dateStr]||emptyDay()), ...updates }
                 }};
                 localStorage.setItem('6mc-v2', JSON.stringify(nd));
+                if (userIdRef.current) window._cloudSave(userIdRef.current, nd);
                 return nd;
             });
         }, []);
@@ -114,11 +197,32 @@
                 });
                 const nd = {...prev, books, dailyLogs:{...prev.dailyLogs,[dateStr]:{...(prev.dailyLogs[dateStr]||emptyDay()),pagesRead,readingBookId:bId}}};
                 localStorage.setItem('6mc-v2', JSON.stringify(nd));
+                if (userIdRef.current) window._cloudSave(userIdRef.current, nd);
                 return nd;
             });
         }, []);
 
         if (!data) return <div className="flex items-center justify-center h-screen text-slate-400">Loading…</div>;
+
+        if (showSetup) return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center px-6">
+                <div className="bg-white rounded-3xl shadow-lg p-8 max-w-sm w-full">
+                    <div className="text-4xl text-center mb-4">☁️</div>
+                    <h2 className="text-xl font-bold text-slate-800 text-center mb-2">Set up cloud sync</h2>
+                    <p className="text-sm text-slate-500 text-center mb-6">Enter a passphrase to sync your data across your phone and laptop. Use the <strong>same passphrase</strong> on all devices.</p>
+                    <input
+                        className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-400 mb-3"
+                        placeholder="e.g. veer-passion-2026"
+                        value={passInput} onChange={e=>setPassInput(e.target.value)}
+                        onKeyDown={e=>e.key==='Enter'&&doSetup()}
+                        autoCapitalize="none" autoCorrect="off"
+                    />
+                    {setupErr && <p className="text-xs text-red-500 mb-3">{setupErr}</p>}
+                    <button onClick={doSetup} className="w-full bg-blue-600 text-white rounded-xl py-3 font-semibold text-sm hover:bg-blue-700 transition mb-3">Start Syncing</button>
+                    <button onClick={()=>setShowSetup(false)} className="w-full text-slate-400 text-sm py-2 hover:text-slate-600 transition">Skip for now</button>
+                </div>
+            </div>
+        );
 
         const challDay = Math.max(0, Math.min(daysBetween(CHALLENGE_START, today)+1, TOTAL_DAYS));
 
@@ -140,9 +244,15 @@
                             <h1 className="text-lg font-bold text-slate-800">Passion Project</h1>
                             <p className="text-xs text-slate-400 mt-0.5">{today < CHALLENGE_START ? '🚀 Starts tomorrow — Feb 24' : `Day ${challDay} of ${TOTAL_DAYS}`} · {new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'})}</p>
                         </div>
-                        <button onClick={()=>setPrivacy(p=>!p)} className={`mt-1 text-xs px-3 py-1.5 rounded-xl font-medium transition ${privacy?'bg-slate-800 text-white':'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
-                            {privacy ? '👁 Show' : '🙈 Hide'}
-                        </button>
+                        <div className="flex items-center gap-2 mt-1">
+                            {syncStatus==='syncing' && <span title="Syncing…"    className="text-base">🔄</span>}
+                            {syncStatus==='synced'  && <span title="Synced"      className="text-base">☁️</span>}
+                            {syncStatus==='offline' && <span title="Offline"     className="text-base">⚡</span>}
+                            {syncStatus==='idle'    && <button onClick={()=>setShowSetup(true)} title="Set up sync" className="text-base">⚙️</button>}
+                            <button onClick={()=>setPrivacy(p=>!p)} className={`text-xs px-3 py-1.5 rounded-xl font-medium transition ${privacy?'bg-slate-800 text-white':'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+                                {privacy ? '👁 Show' : '🙈 Hide'}
+                            </button>
+                        </div>
                     </div>
                     <div className="max-w-7xl mx-auto px-6 flex gap-0 overflow-x-auto">
                         {TABS.map(t=>(
