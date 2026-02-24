@@ -90,7 +90,8 @@
 
     const CHALLENGE_START = '2026-02-24';
     const TOTAL_DAYS      = 189;
-    const HYROX_DATE      = '2026-11-15';
+    const HYROX_DATE      = '2026-04-12';
+    const HYROX_WEIGHT    = 81;
     const NW_GOAL         = 600000;
 
     const MONTHS = [
@@ -330,7 +331,8 @@
         const wEntries = Object.entries(logs).filter(([_,l])=>l.weight).sort(([a],[b])=>a<b?-1:1);
         const latestW  = wEntries.length ? wEntries[wEntries.length-1][1].weight : null;
         const gymWk    = wDates.filter(d=>logs[d]?.gym).length;
-        const daysToJuly = Math.max(0,daysBetween(today,'2026-07-01'));
+        const daysToJuly  = Math.max(0,daysBetween(today,'2026-07-01'));
+        const daysToHyrox = Math.max(0,daysBetween(today,HYROX_DATE));
 
         // Work
         const workWk = wDates.reduce((s,d)=>s+(parseFloat(logs[d]?.workHours)||0),0);
@@ -388,13 +390,16 @@
                     {/* Fitness */}
                     <ClickCard color="bg-emerald-600" onClick={()=>goTo('fitness')}>
                         <div className="text-2xl">⚖️</div>
-                        <div className="font-bold text-sm mt-1">78 kg by July</div>
+                        <div className="font-bold text-sm mt-1">Fitness</div>
                         {latestW ? (<>
                             <div className="text-3xl font-bold mt-1">{latestW}<span className="text-base font-normal"> kg</span></div>
-                            <div className="text-xs opacity-75">{daysToJuly}d to July · gym {gymWk}/4 wk</div>
+                            {daysToHyrox > 0
+                                ? <div className="text-xs opacity-75">🏁 Hyrox in {daysToHyrox}d · need ≤{HYROX_WEIGHT} kg</div>
+                                : <div className="text-xs opacity-75">→ 78 kg by July · {daysToJuly}d to go</div>
+                            }
                         </>) : (<>
                             <div className="text-lg font-semibold mt-2 opacity-80">Log weight</div>
-                            <div className="text-xs opacity-60">{daysToJuly} days to July</div>
+                            <div className="text-xs opacity-60">🏁 Hyrox Apr 12 · need ≤{HYROX_WEIGHT} kg</div>
                         </>)}
                         <div className="text-xs opacity-50 mt-1">Tap for details →</div>
                     </ClickCard>
@@ -754,7 +759,7 @@
             <div className="space-y-5">
                 <div>
                     <h2 className="text-xl font-bold text-slate-800">🏋️ Fitness</h2>
-                    <p className="text-sm text-slate-400 mt-0.5">78 kg by July · 81-82 kg for Hyrox Nov 2026</p>
+                    <p className="text-sm text-slate-400 mt-0.5">🏁 Hyrox Apr 12 (≤81 kg) · 78 kg by July</p>
                 </div>
 
                 {/* Weight hero */}
@@ -763,8 +768,8 @@
                         <p className="text-sm opacity-75">Current weight</p>
                         <p className="text-5xl font-bold">{latestW} kg</p>
                         <div className="grid grid-cols-2 gap-4 mt-4">
-                            <div><p className="text-sm opacity-75">→ 78 kg target</p><p className="font-semibold">{latestW>78?`${(latestW-78).toFixed(1)} kg to lose`:'✓ At target'} · {daysToJuly}d</p></div>
-                            <div><p className="text-sm opacity-75">→ Hyrox 81-82 kg</p><p className="font-semibold">{daysToHyrox}d to Nov 2026</p></div>
+                            <div><p className="text-sm opacity-75">🏁 Hyrox Apr 12</p><p className="font-semibold">{daysToHyrox > 0 ? `${daysToHyrox}d away` : 'Done!'} · need ≤{HYROX_WEIGHT} kg</p></div>
+                            <div><p className="text-sm opacity-75">🎯 78 kg by July</p><p className="font-semibold">{latestW>78?`${(latestW-78).toFixed(1)} kg to lose`:'✓ At target'} · {daysToJuly}d</p></div>
                         </div>
                         {startW && latestW<startW && <p className="text-sm opacity-75 mt-2">↓ {(startW-latestW).toFixed(1)} kg lost since start</p>}
                     </>) : (<>
