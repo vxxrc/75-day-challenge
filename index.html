@@ -145,6 +145,7 @@
         const [setupErr, setSetupErr]     = useState('');
         const [darkMode, setDarkMode]     = useState(() => localStorage.getItem('pp-dark') === '1');
         const [resetConfirm, setResetConfirm] = useState(false);
+        const [menuOpen, setMenuOpen]         = useState(false);
         const userIdRef = useRef(localStorage.getItem('pp-sync-id') || '');
         const today = fmtDate(new Date());
 
@@ -303,26 +304,50 @@
 
         return (
             <div className="min-h-screen bg-slate-50">
-                <div className="bg-white border-b border-slate-200 sticky top-0 z-20" style={{paddingTop:'env(safe-area-inset-top)'}}>
-                    <div className="max-w-7xl mx-auto px-4 pt-4 pb-1 flex items-center justify-between">
+                {menuOpen && <div className="fixed inset-0 z-30" onClick={()=>setMenuOpen(false)}/>}
+                <div className="bg-white border-b border-slate-200 sticky top-0 z-40" style={{paddingTop:'env(safe-area-inset-top)'}}>
+                    <div className="max-w-7xl mx-auto px-4 pt-4 pb-1 flex items-center justify-between relative">
                         <div>
                             <h1 className="text-lg font-bold text-slate-800">Passion Project</h1>
                             <p className="text-xs text-slate-400 mt-0.5">{today < CHALLENGE_START ? '🚀 Starts tomorrow — Feb 26' : `Day ${challDay} of ${TOTAL_DAYS}`} · {new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'})}</p>
                         </div>
-                        <div className="flex items-center gap-3">
-                            {syncStatus==='syncing' && <span title="Syncing…" className="text-xl">🔄</span>}
-                            {syncStatus==='synced'  && <span title="Synced"   className="text-xl">☁️</span>}
-                            {syncStatus==='offline' && <span title="Offline"  className="text-xl">⚡</span>}
-                            <button onClick={()=>{setResetConfirm(false);setShowSetup(true);}} title="Settings" className="text-xl">⚙️</button>
-                            <button onClick={()=>setDarkMode(d=>!d)} title={darkMode?'Light mode':'Dark mode'} className="text-xl">{darkMode ? '☀️' : '🌙'}</button>
-                            <button onClick={()=>setPrivacy(p=>!p)} className={`text-xs px-3 py-1.5 rounded-xl font-medium transition ${privacy?'bg-slate-800 text-white':'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
-                                {privacy ? '👁 Show' : '🙈 Hide'}
-                            </button>
-                        </div>
+                        <button onClick={()=>setMenuOpen(o=>!o)} className="w-9 h-9 flex flex-col items-center justify-center gap-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 transition">
+                            <span className="block w-4.5 h-0.5 bg-slate-600 rounded"/>
+                            <span className="block w-4.5 h-0.5 bg-slate-600 rounded"/>
+                            <span className="block w-4.5 h-0.5 bg-slate-600 rounded"/>
+                        </button>
+                        {menuOpen && (
+                            <div className="absolute right-4 top-full mt-1 w-64 bg-white rounded-2xl shadow-xl border border-slate-100 z-50 overflow-hidden">
+                                {/* Sync status */}
+                                <button onClick={()=>{setMenuOpen(false);setResetConfirm(false);setShowSetup(true);}} className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition border-b border-slate-100">
+                                    <span className="text-sm font-medium text-slate-700">Cloud sync</span>
+                                    <span className="text-sm text-slate-500">
+                                        {syncStatus==='synced'  ? '☁️ Synced'   : ''}
+                                        {syncStatus==='syncing' ? '🔄 Syncing…' : ''}
+                                        {syncStatus==='offline' ? '⚡ Offline'  : ''}
+                                        {syncStatus==='idle'    ? '⚙️ Set up'   : ''}
+                                    </span>
+                                </button>
+                                {/* Dark mode */}
+                                <button onClick={()=>setDarkMode(d=>!d)} className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition border-b border-slate-100">
+                                    <span className="text-sm font-medium text-slate-700">Dark mode</span>
+                                    <span className="text-sm">{darkMode ? '☀️ On' : '🌙 Off'}</span>
+                                </button>
+                                {/* Privacy */}
+                                <button onClick={()=>setPrivacy(p=>!p)} className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition border-b border-slate-100">
+                                    <span className="text-sm font-medium text-slate-700">Hide numbers</span>
+                                    <span className="text-sm">{privacy ? '🙈 On' : '👁 Off'}</span>
+                                </button>
+                                {/* Reset */}
+                                <button onClick={()=>{setMenuOpen(false);setResetConfirm(false);setShowSetup(true);}} className="w-full flex items-center px-5 py-4 hover:bg-red-50 transition">
+                                    <span className="text-sm font-medium text-red-500">🗑 Reset all data</span>
+                                </button>
+                            </div>
+                        )}
                     </div>
                     <div className="max-w-7xl mx-auto px-2 flex gap-0 overflow-x-auto">
                         {TABS.map(t=>(
-                            <button key={t.id} onClick={()=>setView(t.id)}
+                            <button key={t.id} onClick={()=>{setView(t.id);setMenuOpen(false);}}
                                 className={`px-3 py-3.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${view===t.id?'border-blue-600 text-blue-600':'border-transparent text-slate-500 hover:text-slate-700'}`}>
                                 {t.label}
                             </button>
