@@ -199,6 +199,8 @@
     // ── APP ───────────────────────────────────────────────────────────────────
     function App() {
         const [view, setView]             = useState('dashboard');
+        const [goalsTab, setGoalsTab]     = useState('daily');
+        const [fundTab,  setFundTab]      = useState('fitness');
         const [data, setData]             = useState(null);
         const [privacy, setPrivacy]       = useState(false);
         const [syncStatus, setSyncStatus] = useState('loading');
@@ -358,16 +360,17 @@
         const challDay = Math.max(0, Math.min(daysBetween(CHALLENGE_START, today)+1, TOTAL_DAYS));
 
         const TABS = [
-            { id:'dashboard', label:'📊 Dashboard' },
-            { id:'daily',     label:'📝 Daily' },
-            { id:'weekly',    label:'📅 Weekly' },
-            { id:'monthly',   label:'🗓 Monthly' },
-            { id:'isb',       label:'🎓 ISB' },
-            { id:'fitness',   label:'🏋️ Fitness' },
-            { id:'reading',   label:'📖 Reading' },
-            { id:'work',      label:'💼 Work' },
-            { id:'wealth',    label:'💰 Wealth' },
+            { id:'dashboard',    label:'Dashboard' },
+            { id:'goals',        label:'Goals' },
+            { id:'fundamentals', label:'Fundamentals' },
         ];
+
+        const navigate = (main, sub) => {
+            setView(main);
+            setMenuOpen(false);
+            if(sub && main==='goals')        setGoalsTab(sub);
+            if(sub && main==='fundamentals') setFundTab(sub);
+        };
 
         return (
             <div className="min-h-screen bg-slate-50">
@@ -414,8 +417,8 @@
                     </div>
                     <div className="max-w-7xl mx-auto px-2 flex gap-0 overflow-x-auto">
                         {TABS.map(t=>(
-                            <button key={t.id} onClick={()=>{setView(t.id);setMenuOpen(false);}}
-                                className={`px-3 py-3.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${view===t.id?'border-blue-600 text-blue-600':'border-transparent text-slate-500 hover:text-slate-700'}`}>
+                            <button key={t.id} onClick={()=>navigate(t.id)}
+                                className={`px-5 py-3.5 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${view===t.id?'border-blue-600 text-blue-600':'border-transparent text-slate-500 hover:text-slate-700'}`}>
                                 {t.label}
                             </button>
                         ))}
@@ -423,22 +426,46 @@
                 </div>
 
                 <div className="max-w-7xl mx-auto px-4 py-5 pb-24">
-                    {view==='dashboard' && <Dashboard  data={data} today={today} challDay={challDay} privacy={privacy} goTo={setView} />}
-                    {view==='daily'     && <DailyView  data={data} today={today} challDay={challDay} updateDay={updateDay} updateReading={updateReading} save={persist} />}
-                    {view==='weekly'    && <WeeklyView  data={data} today={today} save={persist} />}
-                    {view==='monthly'   && <MonthlyView data={data} today={today} save={persist} />}
-                    {view==='isb'     && <ISBView  data={data} save={persist} today={today} />}
-                    {view==='fitness' && <FitnessView data={data} save={persist} today={today} />}
-                    {view==='reading' && <ReadingView data={data} save={persist} today={today} />}
-                    {view==='work'    && <WorkView data={data} save={persist} today={today} />}
-                    {view==='wealth'  && <WealthView data={data} save={persist} privacy={privacy} today={today} />}
+                    {view==='dashboard' && <Dashboard data={data} today={today} challDay={challDay} privacy={privacy} navigate={navigate} />}
+
+                    {view==='goals' && (<>
+                        {/* Goals sub-nav */}
+                        <div className="flex gap-2 mb-5">
+                            {[['daily','📝 Daily'],['weekly','📅 Weekly'],['monthly','🗓 Monthly']].map(([id,lbl])=>(
+                                <button key={id} onClick={()=>setGoalsTab(id)}
+                                    className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${goalsTab===id?'bg-blue-600 text-white':'bg-white border border-slate-200 text-slate-600 hover:border-blue-400'}`}>
+                                    {lbl}
+                                </button>
+                            ))}
+                        </div>
+                        {goalsTab==='daily'   && <DailyView  data={data} today={today} challDay={challDay} updateDay={updateDay} updateReading={updateReading} save={persist} />}
+                        {goalsTab==='weekly'  && <WeeklyView  data={data} today={today} save={persist} />}
+                        {goalsTab==='monthly' && <MonthlyView data={data} today={today} save={persist} />}
+                    </>)}
+
+                    {view==='fundamentals' && (<>
+                        {/* Fundamentals sub-nav */}
+                        <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
+                            {[['isb','🎓 ISB'],['fitness','🏋️ Fitness'],['reading','📖 Reading'],['work','💼 Work'],['wealth','💰 Wealth']].map(([id,lbl])=>(
+                                <button key={id} onClick={()=>setFundTab(id)}
+                                    className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${fundTab===id?'bg-blue-600 text-white':'bg-white border border-slate-200 text-slate-600 hover:border-blue-400'}`}>
+                                    {lbl}
+                                </button>
+                            ))}
+                        </div>
+                        {fundTab==='isb'     && <ISBView     data={data} save={persist} today={today} />}
+                        {fundTab==='fitness' && <FitnessView data={data} save={persist} today={today} />}
+                        {fundTab==='reading' && <ReadingView data={data} save={persist} today={today} />}
+                        {fundTab==='work'    && <WorkView    data={data} save={persist} today={today} />}
+                        {fundTab==='wealth'  && <WealthView  data={data} save={persist} privacy={privacy} today={today} />}
+                    </>)}
                 </div>
             </div>
         );
     }
 
     // ── DASHBOARD ─────────────────────────────────────────────────────────────
-    function Dashboard({ data, today, challDay, privacy, goTo }) {
+    function Dashboard({ data, today, challDay, privacy, navigate }) {
         const logs = data.dailyLogs;
         const ws   = getWeekStart(today);
         const wDates = getWeekDates(ws);
@@ -494,13 +521,13 @@
                     <div className="bg-slate-100 rounded-full h-3"><div className="bg-blue-600 rounded-full h-3 transition-all" style={{width:`${pct}%`}}/></div>
                     {/* Period summary pills */}
                     <div className="flex gap-2 mt-4 flex-wrap">
-                        <button onClick={()=>goTo('daily')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${todayHit===todayTotal&&todayTotal>0?'bg-emerald-50 border-emerald-200 text-emerald-700':'bg-slate-50 border-slate-200 text-slate-600 hover:border-blue-300'}`}>
+                        <button onClick={()=>navigate('goals','daily')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${todayHit===todayTotal&&todayTotal>0?'bg-emerald-50 border-emerald-200 text-emerald-700':'bg-slate-50 border-slate-200 text-slate-600 hover:border-blue-300'}`}>
                             📝 Today {todayTotal>0?`${todayHit}/${todayTotal}`:'→ set goals'}
                         </button>
-                        <button onClick={()=>goTo('weekly')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${wkTotal>0&&wkHit===wkTotal?'bg-emerald-50 border-emerald-200 text-emerald-700':'bg-slate-50 border-slate-200 text-slate-600 hover:border-blue-300'}`}>
+                        <button onClick={()=>navigate('goals','weekly')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${wkTotal>0&&wkHit===wkTotal?'bg-emerald-50 border-emerald-200 text-emerald-700':'bg-slate-50 border-slate-200 text-slate-600 hover:border-blue-300'}`}>
                             📅 This week {wkTotal>0?`${wkHit}/${wkTotal}`:'→ set targets'}
                         </button>
-                        <button onClick={()=>goTo('monthly')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${mTotal>0&&mHit===mTotal?'bg-emerald-50 border-emerald-200 text-emerald-700':'bg-slate-50 border-slate-200 text-slate-600 hover:border-blue-300'}`}>
+                        <button onClick={()=>navigate('goals','monthly')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${mTotal>0&&mHit===mTotal?'bg-emerald-50 border-emerald-200 text-emerald-700':'bg-slate-50 border-slate-200 text-slate-600 hover:border-blue-300'}`}>
                             🗓 This month {mTotal>0?`${mHit}/${mTotal}`:'→ set targets'}
                         </button>
                     </div>
@@ -511,7 +538,7 @@
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
 
                     {/* ISB */}
-                    <ClickCard color="bg-blue-600" onClick={()=>goTo('isb')}>
+                    <ClickCard color="bg-blue-600" onClick={()=>navigate('fundamentals','isb')}>
                         <div className="text-2xl">🎓</div>
                         <div className="font-bold text-sm mt-1">ISB 2026</div>
                         <div className="text-3xl font-bold mt-1">{streak>0?streak:studyDays}</div>
@@ -521,7 +548,7 @@
                     </ClickCard>
 
                     {/* Fitness */}
-                    <ClickCard color="bg-emerald-600" onClick={()=>goTo('fitness')}>
+                    <ClickCard color="bg-emerald-600" onClick={()=>navigate('fundamentals','fitness')}>
                         <div className="text-2xl">⚖️</div>
                         <div className="font-bold text-sm mt-1">Fitness</div>
                         {latestW ? (<>
@@ -538,7 +565,7 @@
                     </ClickCard>
 
                     {/* Work */}
-                    <ClickCard color="bg-violet-600" onClick={()=>goTo('work')}>
+                    <ClickCard color="bg-violet-600" onClick={()=>navigate('fundamentals','work')}>
                         <div className="text-2xl">💼</div>
                         <div className="font-bold text-sm mt-1">Work First</div>
                         <div className="text-3xl font-bold mt-1">{workWk.toFixed(1)}<span className="text-base font-normal">h</span></div>
@@ -547,7 +574,7 @@
                     </ClickCard>
 
                     {/* Reading */}
-                    <ClickCard color="bg-amber-500" onClick={()=>goTo('reading')}>
+                    <ClickCard color="bg-amber-500" onClick={()=>navigate('fundamentals','reading')}>
                         <div className="text-2xl">📖</div>
                         <div className="font-bold text-sm mt-1">Reading</div>
                         {curBook ? (<>
@@ -562,7 +589,7 @@
                     </ClickCard>
 
                     {/* Wealth */}
-                    <ClickCard color="bg-green-600" onClick={()=>goTo('wealth')}>
+                    <ClickCard color="bg-green-600" onClick={()=>navigate('fundamentals','wealth')}>
                         <div className="text-2xl">💰</div>
                         <div className="font-bold text-sm mt-1">₹6L Net Worth</div>
                         {nw!==null ? (<>
