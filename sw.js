@@ -1,4 +1,4 @@
-const CACHE = '6mc-v15';
+const CACHE = '6mc-v16';
 
 const ASSETS = [
     './',

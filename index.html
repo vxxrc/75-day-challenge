@@ -124,19 +124,81 @@
         return `₹${n.toLocaleString('en-IN')}`;
     }
     const calcNW = e => (e.demat||0)+(e.crypto||0)+(e.bank||0)-(e.creditCard||0);
+
+    function weekStats(logs, weekStart) {
+        const dates = getWeekDates(weekStart);
+        return {
+            gymSessions: dates.filter(d => logs[d]?.gym).length,
+            runKm:       dates.reduce((s,d) => s+(parseFloat(logs[d]?.runKm)||0), 0),
+            studyHours:  dates.reduce((s,d) => s+(parseFloat(logs[d]?.studyHours)||0), 0),
+            pagesRead:   dates.reduce((s,d) => s+(parseInt(logs[d]?.pagesRead)||0), 0),
+        };
+    }
+    function monthStats(logs, monthKey) {
+        const entries = Object.entries(logs).filter(([d]) => d.startsWith(monthKey));
+        return {
+            gymSessions: entries.filter(([,l]) => l.gym).length,
+            runKm:       entries.reduce((s,[,l]) => s+(parseFloat(l.runKm)||0), 0),
+            studyHours:  entries.reduce((s,[,l]) => s+(parseFloat(l.studyHours)||0), 0),
+            pagesRead:   entries.reduce((s,[,l]) => s+(parseInt(l.pagesRead)||0), 0),
+        };
+    }
+    function dailyGoalsHit(log, cfg, dateStr) {
+        const studyT = isWeekend(dateStr) ? 5 : 3;
+        let hit = 0, total = 0;
+        total++; if(log.gym) hit++;
+        if((cfg.runKm||0) > 0) { total++; if((parseFloat(log.runKm)||0) >= cfg.runKm) hit++; }
+        { total++; if((parseFloat(log.studyHours)||0) >= (cfg.studyHours||studyT)) hit++; }
+        if((cfg.pagesRead||0) > 0) { total++; if((parseInt(log.pagesRead)||0) >= cfg.pagesRead) hit++; }
+        (cfg.custom||[]).forEach(g => {
+            total++;
+            if(g.type==='boolean') { if(log[`cg_${g.id}`]) hit++; }
+            else { if((parseFloat(log[`cg_${g.id}`])||0) >= (g.target||1)) hit++; }
+        });
+        return { hit, total };
+    }
+    function weekGoalsHit(logs, weekStart, wg) {
+        if(!wg) return { hit:0, total:0 };
+        const ws = weekStats(logs, weekStart);
+        let hit = 0, total = 0;
+        if((wg.gymSessions||0)>0) { total++; if(ws.gymSessions >= wg.gymSessions) hit++; }
+        if((wg.runKm||0)>0)       { total++; if(ws.runKm       >= wg.runKm)       hit++; }
+        if((wg.studyHours||0)>0)  { total++; if(ws.studyHours  >= wg.studyHours)  hit++; }
+        if((wg.pagesRead||0)>0)   { total++; if(ws.pagesRead   >= wg.pagesRead)   hit++; }
+        return { hit, total };
+    }
+    function monthGoalsHit(logs, monthKey, mg) {
+        if(!mg) return { hit:0, total:0 };
+        const ms = monthStats(logs, monthKey);
+        let hit = 0, total = 0;
+        if((mg.gymSessions||0)>0) { total++; if(ms.gymSessions >= mg.gymSessions) hit++; }
+        if((mg.runKm||0)>0)       { total++; if(ms.runKm       >= mg.runKm)       hit++; }
+        if((mg.studyHours||0)>0)  { total++; if(ms.studyHours  >= mg.studyHours)  hit++; }
+        if((mg.pagesRead||0)>0)   { total++; if(ms.pagesRead   >= mg.pagesRead)   hit++; }
+        return { hit, total };
+    }
+
     const emptyDay = () => ({ gym:false,running:false,greenTea:false,outsideFood:false,cheatMeal:false,weight:null,studyHours:0,workHours:0,pagesRead:0,readingBookId:null,screenTime:0,runKm:0,runSpeed:0 });
-    const initData = () => ({ dailyLogs:{},books:[],currentBookId:null,monthlyNotes:{},netWorthLogs:[] });
+    const initData = () => ({
+        dailyLogs:{}, books:[], currentBookId:null, monthlyNotes:{}, netWorthLogs:[],
+        dailyGoalConfig: { gym:true, runKm:5, studyHours:3, pagesRead:20, custom:[] },
+        weeklyGoals: {},
+        monthlyGoals: {}
+    });
 
     function mergeData(local, cloud) {
         const allDates = new Set([...Object.keys(local.dailyLogs||{}), ...Object.keys(cloud.dailyLogs||{})]);
         const dailyLogs = {};
         allDates.forEach(d => { dailyLogs[d] = {...(local.dailyLogs?.[d]||{}), ...(cloud.dailyLogs?.[d]||{})}; });
-        return {...local, ...cloud, dailyLogs};
+        // Merge weekly/monthly goals: union of keys, cloud wins per-key
+        const weeklyGoals  = { ...(local.weeklyGoals||{}),  ...(cloud.weeklyGoals||{})  };
+        const monthlyGoals = { ...(local.monthlyGoals||{}), ...(cloud.monthlyGoals||{}) };
+        return {...local, ...cloud, dailyLogs, weeklyGoals, monthlyGoals};
     }
 
     // ── APP ───────────────────────────────────────────────────────────────────
     function App() {
-        const [view, setView]             = useState('home');
+        const [view, setView]             = useState('dashboard');
         const [data, setData]             = useState(null);
         const [privacy, setPrivacy]       = useState(false);
         const [syncStatus, setSyncStatus] = useState('loading');
@@ -164,7 +226,10 @@
                 let local;
                 try { const s = localStorage.getItem('6mc-v2'); local = s ? JSON.parse(s) : initData(); }
                 catch { local = initData(); }
-                if (!local.netWorthLogs) local.netWorthLogs = [];
+                if (!local.netWorthLogs)    local.netWorthLogs    = [];
+                if (!local.dailyGoalConfig) local.dailyGoalConfig = initData().dailyGoalConfig;
+                if (!local.weeklyGoals)     local.weeklyGoals     = {};
+                if (!local.monthlyGoals)    local.monthlyGoals    = {};
                 const uid = localStorage.getItem('pp-sync-id');
                 if (uid) {
                     userIdRef.current = uid;
@@ -293,13 +358,15 @@
         const challDay = Math.max(0, Math.min(daysBetween(CHALLENGE_START, today)+1, TOTAL_DAYS));
 
         const TABS = [
-            { id:'home',    label:'🏠 Home' },
-            { id:'log',     label:'📝 Log' },
-            { id:'isb',     label:'🎓 ISB' },
-            { id:'fitness', label:'🏋️ Fitness' },
-            { id:'reading', label:'📖 Reading' },
-            { id:'work',    label:'💼 Work' },
-            { id:'wealth',  label:'💰 Wealth' },
+            { id:'dashboard', label:'📊 Dashboard' },
+            { id:'daily',     label:'📝 Daily' },
+            { id:'weekly',    label:'📅 Weekly' },
+            { id:'monthly',   label:'🗓 Monthly' },
+            { id:'isb',       label:'🎓 ISB' },
+            { id:'fitness',   label:'🏋️ Fitness' },
+            { id:'reading',   label:'📖 Reading' },
+            { id:'work',      label:'💼 Work' },
+            { id:'wealth',    label:'💰 Wealth' },
         ];
 
         return (
@@ -356,8 +423,10 @@
                 </div>
 
                 <div className="max-w-7xl mx-auto px-4 py-5 pb-24">
-                    {view==='home'    && <Home     data={data} today={today} challDay={challDay} privacy={privacy} goTo={setView} />}
-                    {view==='log'     && <LogToday data={data} today={today} challDay={challDay} updateDay={updateDay} updateReading={updateReading} />}
+                    {view==='dashboard' && <Dashboard  data={data} today={today} challDay={challDay} privacy={privacy} goTo={setView} />}
+                    {view==='daily'     && <DailyView  data={data} today={today} challDay={challDay} updateDay={updateDay} updateReading={updateReading} save={persist} />}
+                    {view==='weekly'    && <WeeklyView  data={data} today={today} save={persist} />}
+                    {view==='monthly'   && <MonthlyView data={data} today={today} save={persist} />}
                     {view==='isb'     && <ISBView  data={data} save={persist} today={today} />}
                     {view==='fitness' && <FitnessView data={data} save={persist} today={today} />}
                     {view==='reading' && <ReadingView data={data} save={persist} today={today} />}
@@ -368,11 +437,12 @@
         );
     }
 
-    // ── HOME ──────────────────────────────────────────────────────────────────
-    function Home({ data, today, challDay, privacy, goTo }) {
+    // ── DASHBOARD ─────────────────────────────────────────────────────────────
+    function Dashboard({ data, today, challDay, privacy, goTo }) {
         const logs = data.dailyLogs;
         const ws   = getWeekStart(today);
         const wDates = getWeekDates(ws);
+        const monthKey = today.slice(0,7);
 
         // ISB
         let streak = 0;
@@ -382,7 +452,6 @@
         // Fitness
         const wEntries = Object.entries(logs).filter(([_,l])=>l.weight).sort(([a],[b])=>a<b?-1:1);
         const latestW  = wEntries.length ? wEntries[wEntries.length-1][1].weight : null;
-        const gymWk    = wDates.filter(d=>logs[d]?.gym).length;
         const daysToJuly  = Math.max(0,daysBetween(today,'2026-07-01'));
         const daysToHyrox = Math.max(0,daysBetween(today,HYROX_DATE));
 
@@ -399,12 +468,18 @@
         const latestNW = nwLogs.length ? nwLogs[nwLogs.length-1] : null;
         const nw       = latestNW ? calcNW(latestNW) : null;
 
-        // Today's log status
+        // Today goals summary
         const tl = logs[today]||emptyDay();
-        const studyT   = isWeekend(today)?5:3;
-        const screenTh = isWeekend(today)?4:3;
-        const scH      = parseFloat(tl.screenTime)||0;
-        const todayGoals = [tl.gym, (parseFloat(tl.studyHours)||0)>=studyT, (parseFloat(tl.workHours)||0)>0, (tl.pagesRead||0)>0, tl.weight!==null, scH>0&&scH<=screenTh].filter(Boolean).length;
+        const cfg = data.dailyGoalConfig || initData().dailyGoalConfig;
+        const { hit: todayHit, total: todayTotal } = dailyGoalsHit(tl, cfg, today);
+
+        // Weekly goals summary
+        const wg = data.weeklyGoals?.[ws];
+        const { hit: wkHit, total: wkTotal } = weekGoalsHit(logs, ws, wg);
+
+        // Monthly goals summary
+        const mg = data.monthlyGoals?.[monthKey];
+        const { hit: mHit, total: mTotal } = monthGoalsHit(logs, monthKey, mg);
 
         const pct = Math.min(100,((challDay/TOTAL_DAYS)*100)).toFixed(0);
 
@@ -413,20 +488,26 @@
                 {/* Progress bar */}
                 <div className="bg-white rounded-2xl p-5 border border-slate-100">
                     <div className="flex justify-between items-end mb-3">
-                        <div><p className="font-bold text-slate-800 text-lg">Passion Project</p><p className="text-xs text-slate-400">Feb 24 – Aug 31, 2026</p></div>
+                        <div><p className="font-bold text-slate-800 text-lg">Passion Project</p><p className="text-xs text-slate-400">Feb 26 – Aug 31, 2026</p></div>
                         <div className="text-right"><span className="text-3xl font-bold text-blue-600">{pct}%</span><p className="text-xs text-slate-400">Day {challDay}/{TOTAL_DAYS}</p></div>
                     </div>
                     <div className="bg-slate-100 rounded-full h-3"><div className="bg-blue-600 rounded-full h-3 transition-all" style={{width:`${pct}%`}}/></div>
-                    <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-50">
-                        <p className="text-sm text-slate-500">Today logged</p>
-                        <span className={`font-bold text-sm ${todayGoals>=5?'text-emerald-600':todayGoals>=3?'text-amber-600':'text-slate-400'}`}>
-                            {todayGoals}/6 {todayGoals>=5?'✓':todayGoals===0?'→ Log now':''}
-                        </span>
+                    {/* Period summary pills */}
+                    <div className="flex gap-2 mt-4 flex-wrap">
+                        <button onClick={()=>goTo('daily')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${todayHit===todayTotal&&todayTotal>0?'bg-emerald-50 border-emerald-200 text-emerald-700':'bg-slate-50 border-slate-200 text-slate-600 hover:border-blue-300'}`}>
+                            📝 Today {todayTotal>0?`${todayHit}/${todayTotal}`:'→ set goals'}
+                        </button>
+                        <button onClick={()=>goTo('weekly')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${wkTotal>0&&wkHit===wkTotal?'bg-emerald-50 border-emerald-200 text-emerald-700':'bg-slate-50 border-slate-200 text-slate-600 hover:border-blue-300'}`}>
+                            📅 This week {wkTotal>0?`${wkHit}/${wkTotal}`:'→ set targets'}
+                        </button>
+                        <button onClick={()=>goTo('monthly')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${mTotal>0&&mHit===mTotal?'bg-emerald-50 border-emerald-200 text-emerald-700':'bg-slate-50 border-slate-200 text-slate-600 hover:border-blue-300'}`}>
+                            🗓 This month {mTotal>0?`${mHit}/${mTotal}`:'→ set targets'}
+                        </button>
                     </div>
                 </div>
 
-                {/* 5 Goal cards */}
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Your 5 Goals</p>
+                {/* 5 Life Goal cards */}
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Life Goals</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
 
                     {/* ISB */}
@@ -533,9 +614,10 @@
         );
     }
 
-    // ── LOG TODAY ─────────────────────────────────────────────────────────────
-    function LogToday({ data, today, challDay, updateDay, updateReading }) {
+    // ── DAILY VIEW ────────────────────────────────────────────────────────────
+    function DailyView({ data, today, challDay, updateDay, updateReading, save }) {
         const log = data.dailyLogs[today]||emptyDay();
+        const cfg = data.dailyGoalConfig || initData().dailyGoalConfig;
         const [studyInput, setStudyInput] = useState(log.studyHours||'');
         const [workInput,  setWorkInput]  = useState(log.workHours ||'');
         const [wInput,     setWInput]     = useState(log.weight    ||'');
@@ -544,6 +626,8 @@
         const [screenInput, setScreenInput] = useState(log.screenTime ||'');
         const [runKmInput,  setRunKmInput]  = useState(log.runKm      ||'');
         const [runSpeedInput, setRunSpeedInput] = useState(log.runSpeed||'');
+        const [editGoals, setEditGoals]    = useState(false);
+        const [cfgDraft,  setCfgDraft]     = useState(null);
         const activeBooks = data.books.filter(b=>!b.finishedDate);
 
         useEffect(() => {
@@ -578,12 +662,105 @@
         const screenGood = screenH > 0 && screenH <= screenT;
         const goalsHit   = [log.gym, studyH>=studyT, workH>0, (log.pagesRead||0)>0, log.weight!==null, screenGood].filter(Boolean).length;
 
+        const { hit: goalHit, total: goalTotal } = dailyGoalsHit(log, cfg, today);
+
+        const saveCfg = () => {
+            if(!cfgDraft) return;
+            save({ ...data, dailyGoalConfig: cfgDraft });
+            setEditGoals(false);
+            setCfgDraft(null);
+        };
+        const openEdit = () => { setCfgDraft({...cfg, custom:[...(cfg.custom||[]).map(g=>({...g}))]  }); setEditGoals(true); };
+
         return (
             <div className="space-y-5">
                 <div className="text-center pb-1">
                     <h2 className="text-2xl font-bold text-slate-800">{parseD(today).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</h2>
                     <p className="text-sm text-slate-400 mt-1">{challDay > 0 ? `Day ${challDay}` : '🚀 Challenge starts tomorrow'} · {isWeekend(today)?'Weekend — 5h study goal':'Weekday — 3h study goal'}</p>
                 </div>
+
+                {/* Goals Scorecard */}
+                <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+                    <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                        <div className="flex items-center gap-3">
+                            <span className={`text-lg font-bold ${goalHit===goalTotal&&goalTotal>0?'text-emerald-600':goalHit>=goalTotal/2?'text-amber-600':'text-slate-500'}`}>{goalHit}/{goalTotal}</span>
+                            <span className="text-sm text-slate-500">goals today</span>
+                        </div>
+                        <button onClick={openEdit} className="text-xs text-blue-500 hover:text-blue-700 font-medium">Edit targets</button>
+                    </div>
+                    <div className="divide-y divide-slate-50">
+                        {/* Gym */}
+                        <div className="flex items-center justify-between px-5 py-3">
+                            <div className="flex items-center gap-2"><span className="text-base">🏋️</span><span className="text-sm text-slate-700">Gym</span></div>
+                            <span className={`text-sm font-semibold ${log.gym?'text-emerald-600':'text-slate-300'}`}>{log.gym?'✓':'–'}</span>
+                        </div>
+                        {(cfg.runKm||0)>0 && <div className="flex items-center justify-between px-5 py-3">
+                            <div className="flex items-center gap-2"><span className="text-base">🏃</span><span className="text-sm text-slate-700">Run {cfg.runKm} km</span></div>
+                            <span className={`text-sm font-semibold ${(parseFloat(log.runKm)||0)>=cfg.runKm?'text-emerald-600':'text-slate-400'}`}>
+                                {(parseFloat(log.runKm)||0)>0?`${log.runKm} km`:'–'}
+                            </span>
+                        </div>}
+                        <div className="flex items-center justify-between px-5 py-3">
+                            <div className="flex items-center gap-2"><span className="text-base">📚</span><span className="text-sm text-slate-700">Study {cfg.studyHours||studyT}h</span></div>
+                            <span className={`text-sm font-semibold ${studyH>=(cfg.studyHours||studyT)?'text-emerald-600':studyH>0?'text-amber-600':'text-slate-300'}`}>
+                                {studyH>0?`${studyH}h`:'–'}
+                            </span>
+                        </div>
+                        {(cfg.pagesRead||0)>0 && <div className="flex items-center justify-between px-5 py-3">
+                            <div className="flex items-center gap-2"><span className="text-base">📖</span><span className="text-sm text-slate-700">Read {cfg.pagesRead} pages</span></div>
+                            <span className={`text-sm font-semibold ${(parseInt(log.pagesRead)||0)>=cfg.pagesRead?'text-emerald-600':(parseInt(log.pagesRead)||0)>0?'text-amber-600':'text-slate-300'}`}>
+                                {(parseInt(log.pagesRead)||0)>0?`${log.pagesRead} pg`:'–'}
+                            </span>
+                        </div>}
+                        {(cfg.custom||[]).map(g=>(
+                            <div key={g.id} className="flex items-center justify-between px-5 py-3">
+                                <div className="flex items-center gap-2"><span className="text-base">⭐</span><span className="text-sm text-slate-700">{g.label}{g.type==='number'?` (${g.target})`:''}</span></div>
+                                <span className={`text-sm font-semibold ${(g.type==='boolean'?log[`cg_${g.id}`]:(parseFloat(log[`cg_${g.id}`])||0)>=(g.target||1))?'text-emerald-600':'text-slate-300'}`}>
+                                    {g.type==='boolean'?(log[`cg_${g.id}`]?'✓':'–'):(parseFloat(log[`cg_${g.id}`])||0)>0?log[`cg_${g.id}`]:'–'}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Edit Goals Modal */}
+                {editGoals && cfgDraft && (
+                    <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
+                        <p className="font-semibold text-slate-800">Edit daily targets</p>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div><label className="text-xs text-slate-500 mb-1 block">Run goal (km)</label>
+                                <input type="number" step="0.5" min="0" value={cfgDraft.runKm||''} onChange={e=>setCfgDraft(d=>({...d,runKm:parseFloat(e.target.value)||0}))}
+                                    placeholder="0 = skip" className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400"/></div>
+                            <div><label className="text-xs text-slate-500 mb-1 block">Study goal (h)</label>
+                                <input type="number" step="0.5" min="0" value={cfgDraft.studyHours||''} onChange={e=>setCfgDraft(d=>({...d,studyHours:parseFloat(e.target.value)||0}))}
+                                    placeholder="3" className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400"/></div>
+                            <div><label className="text-xs text-slate-500 mb-1 block">Reading goal (pages)</label>
+                                <input type="number" step="1" min="0" value={cfgDraft.pagesRead||''} onChange={e=>setCfgDraft(d=>({...d,pagesRead:parseInt(e.target.value)||0}))}
+                                    placeholder="0 = skip" className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400"/></div>
+                        </div>
+                        {(cfgDraft.custom||[]).map((g,i)=>(
+                            <div key={g.id} className="flex gap-2 items-center">
+                                <input type="text" value={g.label} onChange={e=>setCfgDraft(d=>({...d,custom:d.custom.map((x,j)=>j===i?{...x,label:e.target.value}:x)}))}
+                                    placeholder="Goal label" className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none"/>
+                                <select value={g.type} onChange={e=>setCfgDraft(d=>({...d,custom:d.custom.map((x,j)=>j===i?{...x,type:e.target.value}:x)}))}
+                                    className="border border-slate-200 rounded-xl px-2 py-2 text-sm focus:outline-none">
+                                    <option value="boolean">Check</option><option value="number">Number</option>
+                                </select>
+                                {g.type==='number'&&<input type="number" min="1" value={g.target||1} onChange={e=>setCfgDraft(d=>({...d,custom:d.custom.map((x,j)=>j===i?{...x,target:parseFloat(e.target.value)||1}:x)}))}
+                                    className="w-16 border border-slate-200 rounded-xl px-2 py-2 text-sm focus:outline-none"/>}
+                                <button onClick={()=>setCfgDraft(d=>({...d,custom:d.custom.filter((_,j)=>j!==i)}))} className="text-red-400 hover:text-red-600 text-lg px-1">×</button>
+                            </div>
+                        ))}
+                        <button onClick={()=>setCfgDraft(d=>({...d,custom:[...(d.custom||[]),{id:Date.now(),label:'',type:'boolean',target:1}]}))}
+                            className="text-sm text-blue-500 hover:text-blue-700">+ Add custom goal</button>
+                        <div className="flex gap-2 pt-2">
+                            <button onClick={saveCfg} className="flex-1 bg-blue-600 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-blue-700 transition">Save</button>
+                            <button onClick={()=>{setEditGoals(false);setCfgDraft(null);}} className="flex-1 border border-slate-200 text-slate-600 rounded-xl py-2.5 text-sm hover:bg-slate-50 transition">Cancel</button>
+                        </div>
+                    </div>
+                )}
+
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest pt-1">Log Your Day</p>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {/* LEFT col */}
@@ -713,6 +890,312 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        );
+    }
+
+    // ── WEEKLY VIEW ───────────────────────────────────────────────────────────
+    function WeeklyView({ data, today, save }) {
+        const logs = data.dailyLogs;
+        const ws = getWeekStart(today);
+        const wDates = getWeekDates(ws);
+        const wg = data.weeklyGoals?.[ws] || null;
+        const ws_ = weekStats(logs, ws);
+
+        const [editing, setEditing] = useState(false);
+        const [draft, setDraft]     = useState(null);
+
+        const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+        const openEdit = () => {
+            setDraft(wg ? {...wg, custom:[...(wg.custom||[]).map(g=>({...g}))]} : {gymSessions:4,runKm:25,studyHours:21,pagesRead:140,custom:[]});
+            setEditing(true);
+        };
+        const saveDraft = () => {
+            if(!draft) return;
+            const nd = {...data, weeklyGoals:{...(data.weeklyGoals||{}), [ws]: draft}};
+            save(nd);
+            setEditing(false);
+            setDraft(null);
+        };
+
+        const GBar = ({label,icon,actual,target,unit}) => {
+            if(!target||target<=0) return null;
+            const pct = Math.min(100,(actual/target)*100);
+            const done = actual >= target;
+            return (
+                <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                        <span className="text-sm text-slate-700">{icon} {label}</span>
+                        <span className={`text-sm font-semibold ${done?'text-emerald-600':'text-slate-600'}`}>
+                            {typeof actual==='number'&&actual%1!==0?actual.toFixed(1):actual} / {target} {unit}{done?' ✓':''}
+                        </span>
+                    </div>
+                    <div className="bg-slate-100 rounded-full h-2">
+                        <div className={`rounded-full h-2 transition-all ${done?'bg-emerald-500':'bg-blue-500'}`} style={{width:`${pct}%`}}/>
+                    </div>
+                </div>
+            );
+        };
+
+        const weekLabel = (() => {
+            const s = parseD(ws); const e = new Date(s); e.setDate(e.getDate()+6);
+            return `${s.toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${e.toLocaleDateString('en-US',{month:'short',day:'numeric'})}`;
+        })();
+
+        return (
+            <div className="space-y-5">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-800">📅 Weekly Goals</h2>
+                        <p className="text-sm text-slate-400 mt-0.5">{weekLabel}</p>
+                    </div>
+                    <button onClick={openEdit} className="text-sm font-medium text-blue-600 hover:text-blue-800 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl transition">
+                        {wg ? 'Edit targets' : 'Set targets'}
+                    </button>
+                </div>
+
+                {!wg ? (
+                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-center">
+                        <p className="text-3xl mb-2">📅</p>
+                        <p className="font-semibold text-slate-700 mb-1">No targets for this week</p>
+                        <p className="text-sm text-slate-400 mb-4">Set weekly targets to track your progress here.</p>
+                        <button onClick={openEdit} className="bg-blue-600 text-white rounded-xl px-5 py-2.5 text-sm font-semibold hover:bg-blue-700 transition">Set this week's targets</button>
+                    </div>
+                ) : (
+                    <div className="bg-white rounded-2xl border border-slate-100 p-5 space-y-4">
+                        <GBar label="Gym sessions"  icon="🏋️" actual={ws_.gymSessions} target={wg.gymSessions}  unit="sessions"/>
+                        <GBar label="Running"        icon="🏃" actual={ws_.runKm}       target={wg.runKm}        unit="km"/>
+                        <GBar label="Study"          icon="📚" actual={ws_.studyHours}  target={wg.studyHours}   unit="h"/>
+                        <GBar label="Reading"        icon="📖" actual={ws_.pagesRead}   target={wg.pagesRead}    unit="pages"/>
+                        {(wg.custom||[]).map(g => {
+                            const actual = wDates.reduce((s,d)=>{
+                                const v = logs[d]?.[`cg_${g.id}`];
+                                return s + (g.type==='boolean'?(v?1:0):(parseFloat(v)||0));
+                            }, 0);
+                            return <GBar key={g.id} label={g.label} icon="⭐" actual={actual} target={g.target||1} unit={g.type==='boolean'?'days':''}/>;
+                        })}
+                    </div>
+                )}
+
+                {/* Edit form */}
+                {editing && draft && (
+                    <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
+                        <p className="font-semibold text-slate-800">Set weekly targets</p>
+                        <div className="grid grid-cols-2 gap-3">
+                            {[['gymSessions','Gym sessions','sessions'],['runKm','Running (km)','km'],['studyHours','Study (h)','h'],['pagesRead','Reading (pages)','pg']].map(([key,lbl,unit])=>(
+                                <div key={key}>
+                                    <label className="text-xs text-slate-500 mb-1 block">{lbl}</label>
+                                    <input type="number" min="0" step={key==='gymSessions'?1:0.5} value={draft[key]||''} onChange={e=>setDraft(d=>({...d,[key]:parseFloat(e.target.value)||0}))}
+                                        placeholder="0 = skip" className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400"/>
+                                </div>
+                            ))}
+                        </div>
+                        {(draft.custom||[]).map((g,i)=>(
+                            <div key={g.id} className="flex gap-2 items-center">
+                                <input type="text" value={g.label} onChange={e=>setDraft(d=>({...d,custom:d.custom.map((x,j)=>j===i?{...x,label:e.target.value}:x)}))}
+                                    placeholder="Goal label" className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none"/>
+                                <select value={g.type} onChange={e=>setDraft(d=>({...d,custom:d.custom.map((x,j)=>j===i?{...x,type:e.target.value}:x)}))}
+                                    className="border border-slate-200 rounded-xl px-2 py-2 text-sm focus:outline-none">
+                                    <option value="boolean">Days</option><option value="number">Total</option>
+                                </select>
+                                <input type="number" min="1" value={g.target||1} onChange={e=>setDraft(d=>({...d,custom:d.custom.map((x,j)=>j===i?{...x,target:parseFloat(e.target.value)||1}:x)}))}
+                                    className="w-16 border border-slate-200 rounded-xl px-2 py-2 text-sm focus:outline-none"/>
+                                <button onClick={()=>setDraft(d=>({...d,custom:d.custom.filter((_,j)=>j!==i)}))} className="text-red-400 hover:text-red-600 text-lg px-1">×</button>
+                            </div>
+                        ))}
+                        <button onClick={()=>setDraft(d=>({...d,custom:[...(d.custom||[]),{id:Date.now(),label:'',type:'boolean',target:7}]}))}
+                            className="text-sm text-blue-500 hover:text-blue-700">+ Add custom goal</button>
+                        <div className="flex gap-2 pt-2">
+                            <button onClick={saveDraft} className="flex-1 bg-blue-600 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-blue-700 transition">Save targets</button>
+                            <button onClick={()=>{setEditing(false);setDraft(null);}} className="flex-1 border border-slate-200 text-slate-600 rounded-xl py-2.5 text-sm hover:bg-slate-50 transition">Cancel</button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Day breakdown */}
+                <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+                    <p className="px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-widest border-b border-slate-100">Day breakdown</p>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-xs text-center">
+                            <thead>
+                                <tr className="border-b border-slate-100">
+                                    <th className="py-2 px-3 text-left text-slate-500 font-medium">Metric</th>
+                                    {wDates.map((d,i)=><th key={d} className={`py-2 px-2 font-medium ${d===today?'text-blue-600':'text-slate-500'}`}>{DAYS[i]}</th>)}
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                                <tr>
+                                    <td className="py-2 px-3 text-left text-slate-600">🏋️ Gym</td>
+                                    {wDates.map(d=><td key={d} className={`py-2 px-2 ${logs[d]?.gym?'text-emerald-600 font-bold':'text-slate-300'}`}>{logs[d]?.gym?'✓':'–'}</td>)}
+                                </tr>
+                                <tr>
+                                    <td className="py-2 px-3 text-left text-slate-600">🏃 Run</td>
+                                    {wDates.map(d=><td key={d} className={`py-2 px-2 ${(parseFloat(logs[d]?.runKm)||0)>0?'text-sky-600':'text-slate-300'}`}>
+                                        {(parseFloat(logs[d]?.runKm)||0)>0?`${logs[d].runKm}k`:'–'}
+                                    </td>)}
+                                </tr>
+                                <tr>
+                                    <td className="py-2 px-3 text-left text-slate-600">📚 Study</td>
+                                    {wDates.map(d=>{const h=parseFloat(logs[d]?.studyHours)||0;return<td key={d} className={`py-2 px-2 ${h>0?'text-blue-600':'text-slate-300'}`}>{h>0?`${h}h`:'–'}</td>;})}
+                                </tr>
+                                <tr>
+                                    <td className="py-2 px-3 text-left text-slate-600">📖 Pages</td>
+                                    {wDates.map(d=>{const p=parseInt(logs[d]?.pagesRead)||0;return<td key={d} className={`py-2 px-2 ${p>0?'text-amber-600':'text-slate-300'}`}>{p>0?p:'–'}</td>;})}
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // ── MONTHLY VIEW ──────────────────────────────────────────────────────────
+    function MonthlyView({ data, today, save }) {
+        const logs = data.dailyLogs;
+        const monthKey = today.slice(0,7);
+        const mg = data.monthlyGoals?.[monthKey] || null;
+        const ms = monthStats(logs, monthKey);
+        const monthInfo = MONTHS.find(m=>m.key===monthKey);
+
+        const [editing, setEditing] = useState(false);
+        const [draft, setDraft]     = useState(null);
+
+        const openEdit = () => {
+            setDraft(mg ? {...mg, custom:[...(mg.custom||[]).map(g=>({...g}))]} : {gymSessions:16,runKm:100,studyHours:84,pagesRead:560,custom:[]});
+            setEditing(true);
+        };
+        const saveDraft = () => {
+            if(!draft) return;
+            const nd = {...data, monthlyGoals:{...(data.monthlyGoals||{}), [monthKey]: draft}};
+            save(nd);
+            setEditing(false);
+            setDraft(null);
+        };
+
+        const GBar = ({label,icon,actual,target,unit}) => {
+            if(!target||target<=0) return null;
+            const pct = Math.min(100,(actual/target)*100);
+            const done = actual >= target;
+            return (
+                <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                        <span className="text-sm text-slate-700">{icon} {label}</span>
+                        <span className={`text-sm font-semibold ${done?'text-emerald-600':'text-slate-600'}`}>
+                            {typeof actual==='number'&&actual%1!==0?actual.toFixed(1):actual} / {target} {unit}{done?' ✓':''}
+                        </span>
+                    </div>
+                    <div className="bg-slate-100 rounded-full h-2">
+                        <div className={`rounded-full h-2 transition-all ${done?'bg-emerald-500':'bg-blue-500'}`} style={{width:`${pct}%`}}/>
+                    </div>
+                </div>
+            );
+        };
+
+        // Build week-by-week breakdown for the month
+        const monthEntries = Object.entries(logs).filter(([d])=>d.startsWith(monthKey)).sort(([a],[b])=>a<b?-1:1);
+        const weeksInMonth = [];
+        const seenWeeks = new Set();
+        monthEntries.forEach(([d])=>{
+            const ws = getWeekStart(d);
+            if(!seenWeeks.has(ws)){ seenWeeks.add(ws); weeksInMonth.push(ws); }
+        });
+
+        return (
+            <div className="space-y-5">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-800">🗓 Monthly Goals</h2>
+                        <p className="text-sm text-slate-400 mt-0.5">{monthInfo?.label||monthKey}{monthInfo?.theme?` · ${monthInfo.theme}`:''}</p>
+                    </div>
+                    <button onClick={openEdit} className="text-sm font-medium text-blue-600 hover:text-blue-800 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl transition">
+                        {mg ? 'Edit targets' : 'Set targets'}
+                    </button>
+                </div>
+
+                {!mg ? (
+                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-center">
+                        <p className="text-3xl mb-2">🗓</p>
+                        <p className="font-semibold text-slate-700 mb-1">No targets for this month</p>
+                        <p className="text-sm text-slate-400 mb-4">Set monthly targets to see your progress.</p>
+                        <button onClick={openEdit} className="bg-blue-600 text-white rounded-xl px-5 py-2.5 text-sm font-semibold hover:bg-blue-700 transition">Set this month's targets</button>
+                    </div>
+                ) : (
+                    <div className="bg-white rounded-2xl border border-slate-100 p-5 space-y-4">
+                        <GBar label="Gym sessions"  icon="🏋️" actual={ms.gymSessions} target={mg.gymSessions}  unit="sessions"/>
+                        <GBar label="Running"        icon="🏃" actual={ms.runKm}       target={mg.runKm}        unit="km"/>
+                        <GBar label="Study"          icon="📚" actual={ms.studyHours}  target={mg.studyHours}   unit="h"/>
+                        <GBar label="Reading"        icon="📖" actual={ms.pagesRead}   target={mg.pagesRead}    unit="pages"/>
+                        {(mg.custom||[]).map(g => {
+                            const actual = Object.entries(logs).filter(([d])=>d.startsWith(monthKey)).reduce((s,[d,l])=>{
+                                const v = l[`cg_${g.id}`];
+                                return s + (g.type==='boolean'?(v?1:0):(parseFloat(v)||0));
+                            }, 0);
+                            return <GBar key={g.id} label={g.label} icon="⭐" actual={actual} target={g.target||1} unit={g.type==='boolean'?'days':''}/>;
+                        })}
+                    </div>
+                )}
+
+                {/* Edit form */}
+                {editing && draft && (
+                    <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
+                        <p className="font-semibold text-slate-800">Set monthly targets</p>
+                        <div className="grid grid-cols-2 gap-3">
+                            {[['gymSessions','Gym sessions'],['runKm','Running (km)'],['studyHours','Study (h)'],['pagesRead','Reading (pages)']].map(([key,lbl])=>(
+                                <div key={key}>
+                                    <label className="text-xs text-slate-500 mb-1 block">{lbl}</label>
+                                    <input type="number" min="0" step={key==='gymSessions'?1:1} value={draft[key]||''} onChange={e=>setDraft(d=>({...d,[key]:parseFloat(e.target.value)||0}))}
+                                        placeholder="0 = skip" className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400"/>
+                                </div>
+                            ))}
+                        </div>
+                        {(draft.custom||[]).map((g,i)=>(
+                            <div key={g.id} className="flex gap-2 items-center">
+                                <input type="text" value={g.label} onChange={e=>setDraft(d=>({...d,custom:d.custom.map((x,j)=>j===i?{...x,label:e.target.value}:x)}))}
+                                    placeholder="Goal label" className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none"/>
+                                <select value={g.type} onChange={e=>setDraft(d=>({...d,custom:d.custom.map((x,j)=>j===i?{...x,type:e.target.value}:x)}))}
+                                    className="border border-slate-200 rounded-xl px-2 py-2 text-sm focus:outline-none">
+                                    <option value="boolean">Days</option><option value="number">Total</option>
+                                </select>
+                                <input type="number" min="1" value={g.target||1} onChange={e=>setDraft(d=>({...d,custom:d.custom.map((x,j)=>j===i?{...x,target:parseFloat(e.target.value)||1}:x)}))}
+                                    className="w-16 border border-slate-200 rounded-xl px-2 py-2 text-sm focus:outline-none"/>
+                                <button onClick={()=>setDraft(d=>({...d,custom:d.custom.filter((_,j)=>j!==i)}))} className="text-red-400 hover:text-red-600 text-lg px-1">×</button>
+                            </div>
+                        ))}
+                        <button onClick={()=>setDraft(d=>({...d,custom:[...(d.custom||[]),{id:Date.now(),label:'',type:'boolean',target:30}]}))}
+                            className="text-sm text-blue-500 hover:text-blue-700">+ Add custom goal</button>
+                        <div className="flex gap-2 pt-2">
+                            <button onClick={saveDraft} className="flex-1 bg-blue-600 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-blue-700 transition">Save targets</button>
+                            <button onClick={()=>{setEditing(false);setDraft(null);}} className="flex-1 border border-slate-200 text-slate-600 rounded-xl py-2.5 text-sm hover:bg-slate-50 transition">Cancel</button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Week-by-week breakdown */}
+                {weeksInMonth.length > 0 && (
+                    <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+                        <p className="px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-widest border-b border-slate-100">Week by week</p>
+                        <div className="divide-y divide-slate-50">
+                            {weeksInMonth.map(ws=>{
+                                const wst = weekStats(logs, ws);
+                                const wStart = parseD(ws); const wEnd = new Date(wStart); wEnd.setDate(wEnd.getDate()+6);
+                                const label = `${wStart.toLocaleDateString('en-US',{month:'short',day:'numeric'})}–${wEnd.getDate()}`;
+                                return (
+                                    <div key={ws} className="flex items-center justify-between px-5 py-3">
+                                        <span className="text-xs text-slate-500 w-24">{label}</span>
+                                        <div className="flex gap-4 text-xs">
+                                            <span className={`${wst.gymSessions>0?'text-emerald-600':'text-slate-300'}`}>🏋️ {wst.gymSessions}</span>
+                                            <span className={`${wst.runKm>0?'text-sky-600':'text-slate-300'}`}>🏃 {wst.runKm.toFixed(1)}km</span>
+                                            <span className={`${wst.studyHours>0?'text-blue-600':'text-slate-300'}`}>📚 {wst.studyHours.toFixed(1)}h</span>
+                                            <span className={`${wst.pagesRead>0?'text-amber-600':'text-slate-300'}`}>📖 {wst.pagesRead}p</span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }
