@@ -88,7 +88,7 @@
 <script type="text/babel">
     const { useState, useEffect, useRef, useCallback } = React;
 
-    const CHALLENGE_START = '2026-02-24';
+    const CHALLENGE_START = '2026-02-26';
     const TOTAL_DAYS      = 189;
     const HYROX_DATE      = '2026-04-12';
     const HYROX_WEIGHT    = 81;
@@ -144,6 +144,7 @@
         const [passInput, setPassInput]   = useState('');
         const [setupErr, setSetupErr]     = useState('');
         const [darkMode, setDarkMode]     = useState(() => localStorage.getItem('pp-dark') === '1');
+        const [resetConfirm, setResetConfirm] = useState(false);
         const userIdRef = useRef(localStorage.getItem('pp-sync-id') || '');
         const today = fmtDate(new Date());
 
@@ -203,6 +204,15 @@
             window._cloudSave(id, merged);
         };
 
+        const doReset = async () => {
+            const empty = initData();
+            localStorage.setItem('6mc-v2', JSON.stringify(empty));
+            if (userIdRef.current) window._cloudSave(userIdRef.current, empty);
+            setData(empty);
+            setShowSetup(false);
+            setResetConfirm(false);
+        };
+
         const persist = useCallback(nd => {
             setData(nd);
             localStorage.setItem('6mc-v2', JSON.stringify(nd));
@@ -246,19 +256,35 @@
         if (showSetup) return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center px-6">
                 <div className="bg-white rounded-3xl shadow-lg p-8 max-w-sm w-full">
-                    <div className="text-4xl text-center mb-4">☁️</div>
-                    <h2 className="text-xl font-bold text-slate-800 text-center mb-2">Set up cloud sync</h2>
-                    <p className="text-sm text-slate-500 text-center mb-6">Enter a passphrase to sync your data across your phone and laptop. Use the <strong>same passphrase</strong> on all devices.</p>
-                    <input
-                        className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-400 mb-3"
-                        placeholder="e.g. veer-passion-2026"
-                        value={passInput} onChange={e=>setPassInput(e.target.value)}
-                        onKeyDown={e=>e.key==='Enter'&&doSetup()}
-                        autoCapitalize="none" autoCorrect="off"
-                    />
-                    {setupErr && <p className="text-xs text-red-500 mb-3">{setupErr}</p>}
-                    <button onClick={doSetup} className="w-full bg-blue-600 text-white rounded-xl py-3 font-semibold text-sm hover:bg-blue-700 transition mb-3">Start Syncing</button>
-                    <button onClick={()=>setShowSetup(false)} className="w-full text-slate-400 text-sm py-2 hover:text-slate-600 transition">Skip for now</button>
+                    {userIdRef.current ? (
+                        resetConfirm ? (<>
+                            <div className="text-4xl text-center mb-4">⚠️</div>
+                            <h2 className="text-xl font-bold text-slate-800 text-center mb-2">Reset everything?</h2>
+                            <p className="text-sm text-slate-500 text-center mb-6">This will permanently delete <strong>all your logs, books, weight entries and net worth history</strong> on all devices. This cannot be undone.</p>
+                            <button onClick={doReset} className="w-full bg-red-500 text-white rounded-xl py-3 font-semibold text-sm hover:bg-red-600 transition mb-3">Yes, delete everything</button>
+                            <button onClick={()=>setResetConfirm(false)} className="w-full text-slate-400 text-sm py-2 hover:text-slate-600 transition">Cancel</button>
+                        </>) : (<>
+                            <div className="text-4xl text-center mb-4">⚙️</div>
+                            <h2 className="text-xl font-bold text-slate-800 text-center mb-2">Settings</h2>
+                            <p className="text-sm text-slate-500 text-center mb-6">Syncing as <strong className="text-slate-700">{userIdRef.current}</strong></p>
+                            <button onClick={()=>setResetConfirm(true)} className="w-full bg-red-50 text-red-600 border border-red-200 rounded-xl py-3 font-semibold text-sm hover:bg-red-100 transition mb-3">🗑 Reset all data</button>
+                            <button onClick={()=>{setShowSetup(false);setResetConfirm(false);}} className="w-full text-slate-400 text-sm py-2 hover:text-slate-600 transition">Close</button>
+                        </>)
+                    ) : (<>
+                        <div className="text-4xl text-center mb-4">☁️</div>
+                        <h2 className="text-xl font-bold text-slate-800 text-center mb-2">Set up cloud sync</h2>
+                        <p className="text-sm text-slate-500 text-center mb-6">Enter a passphrase to sync your data across your phone and laptop. Use the <strong>same passphrase</strong> on all devices.</p>
+                        <input
+                            className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-400 mb-3"
+                            placeholder="e.g. veer-passion-2026"
+                            value={passInput} onChange={e=>setPassInput(e.target.value)}
+                            onKeyDown={e=>e.key==='Enter'&&doSetup()}
+                            autoCapitalize="none" autoCorrect="off"
+                        />
+                        {setupErr && <p className="text-xs text-red-500 mb-3">{setupErr}</p>}
+                        <button onClick={doSetup} className="w-full bg-blue-600 text-white rounded-xl py-3 font-semibold text-sm hover:bg-blue-700 transition mb-3">Start Syncing</button>
+                        <button onClick={()=>setShowSetup(false)} className="w-full text-slate-400 text-sm py-2 hover:text-slate-600 transition">Skip for now</button>
+                    </>)}
                 </div>
             </div>
         );
@@ -281,13 +307,13 @@
                     <div className="max-w-7xl mx-auto px-4 pt-4 pb-1 flex items-center justify-between">
                         <div>
                             <h1 className="text-lg font-bold text-slate-800">Passion Project</h1>
-                            <p className="text-xs text-slate-400 mt-0.5">{today < CHALLENGE_START ? '🚀 Starts tomorrow — Feb 24' : `Day ${challDay} of ${TOTAL_DAYS}`} · {new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'})}</p>
+                            <p className="text-xs text-slate-400 mt-0.5">{today < CHALLENGE_START ? '🚀 Starts tomorrow — Feb 26' : `Day ${challDay} of ${TOTAL_DAYS}`} · {new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'})}</p>
                         </div>
                         <div className="flex items-center gap-3">
                             {syncStatus==='syncing' && <span title="Syncing…" className="text-xl">🔄</span>}
                             {syncStatus==='synced'  && <span title="Synced"   className="text-xl">☁️</span>}
                             {syncStatus==='offline' && <span title="Offline"  className="text-xl">⚡</span>}
-                            {syncStatus==='idle'    && <button onClick={()=>setShowSetup(true)} title="Set up sync" className="text-xl">⚙️</button>}
+                            <button onClick={()=>{setResetConfirm(false);setShowSetup(true);}} title="Settings" className="text-xl">⚙️</button>
                             <button onClick={()=>setDarkMode(d=>!d)} title={darkMode?'Light mode':'Dark mode'} className="text-xl">{darkMode ? '☀️' : '🌙'}</button>
                             <button onClick={()=>setPrivacy(p=>!p)} className={`text-xs px-3 py-1.5 rounded-xl font-medium transition ${privacy?'bg-slate-800 text-white':'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
                                 {privacy ? '👁 Show' : '🙈 Hide'}
