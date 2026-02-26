@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Passion Project</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1e40af">
@@ -18,8 +18,15 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <style>
+        html, body { overflow-x: hidden; max-width: 100vw; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding-bottom: env(safe-area-inset-bottom); }
         input[type=number]::-webkit-inner-spin-button { opacity: 1; }
+        * { box-sizing: border-box; }
+        img { max-width: 100%; height: auto; }
+        /* Prevent text overflow */
+        .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        /* Word break for long text */
+        .break-words { word-wrap: break-word; word-break: break-word; }
         /* Dark mode */
         .dark body                          { background-color: #020617; }
         .dark .bg-slate-50                  { background-color: #020617 !important; }
@@ -146,7 +153,7 @@
     function dailyGoalsHit(log, cfg, dateStr) {
         const studyT = isWeekend(dateStr) ? 5 : 3;
         let hit = 0, total = 0;
-        total++; if(log.gym) hit++;
+        total++; if(log.gym || log.running) hit++; // Gym OR Running counts
         if((cfg.runKm||0) > 0) { total++; if((parseFloat(log.runKm)||0) >= cfg.runKm) hit++; }
         { total++; if((parseFloat(log.studyHours)||0) >= (cfg.studyHours||studyT)) hit++; }
         if((cfg.pagesRead||0) > 0) { total++; if((parseInt(log.pagesRead)||0) >= cfg.pagesRead) hit++; }
@@ -181,7 +188,7 @@
     const emptyDay = () => ({ gym:false,running:false,greenTea:false,outsideFood:false,cheatMeal:false,weight:null,studyHours:0,workHours:0,pagesRead:0,readingBookId:null,screenTime:0,runKm:0,runSpeed:0 });
     const initData = () => ({
         dailyLogs:{}, books:[], currentBookId:null, monthlyNotes:{}, netWorthLogs:[],
-        dailyGoalConfig: { gym:true, runKm:5, studyHours:3, pagesRead:20, custom:[] },
+        dailyGoalConfig: { gym:true, runKm:0, studyHours:3, pagesRead:20, custom:[] },
         weeklyGoals: {},
         monthlyGoals: {}
     });
@@ -381,10 +388,8 @@
                             <h1 className="text-lg font-bold text-slate-800">Passion Project</h1>
                             <p className="text-xs text-slate-400 mt-0.5">{today < CHALLENGE_START ? '🚀 Starts tomorrow — Feb 26' : `Day ${challDay} of ${TOTAL_DAYS}`} · {new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'})}</p>
                         </div>
-                        <button onClick={()=>setMenuOpen(o=>!o)} className="w-9 h-9 flex flex-col items-center justify-center gap-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 transition">
-                            <span className="block w-4.5 h-0.5 bg-slate-600 rounded"/>
-                            <span className="block w-4.5 h-0.5 bg-slate-600 rounded"/>
-                            <span className="block w-4.5 h-0.5 bg-slate-600 rounded"/>
+                        <button onClick={()=>setMenuOpen(o=>!o)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-blue-100 hover:bg-blue-200 transition">
+                            <span className="text-2xl">⚙️</span>
                         </button>
                         {menuOpen && (
                             <div className="absolute right-4 top-full mt-1 w-64 bg-white rounded-2xl shadow-xl border border-slate-100 z-50 overflow-hidden">
@@ -415,7 +420,7 @@
                             </div>
                         )}
                     </div>
-                    <div className="max-w-7xl mx-auto px-2 flex gap-0 overflow-x-auto">
+                    <div className="max-w-7xl mx-auto px-4 flex gap-0 overflow-x-auto">
                         {TABS.map(t=>(
                             <button key={t.id} onClick={()=>navigate(t.id)}
                                 className={`px-5 py-3.5 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${view===t.id?'border-blue-600 text-blue-600':'border-transparent text-slate-500 hover:text-slate-700'}`}>
@@ -656,6 +661,7 @@
         const [editGoals, setEditGoals]    = useState(false);
         const [cfgDraft,  setCfgDraft]     = useState(null);
         const activeBooks = data.books.filter(b=>!b.finishedDate);
+        const pagesInputRef = useRef(null);
 
         useEffect(() => {
             setStudyInput(log.studyHours ||'');
@@ -681,13 +687,17 @@
             const p = parseInt(pagesInput);
             if (!readBookId || isNaN(p) || p<=0) return;
             updateReading(today, Number(readBookId), p);
+            setPagesInput('');
+            if (pagesInputRef.current) {
+                pagesInputRef.current.blur();
+            }
         };
 
         const readBook   = log.readingBookId ? data.books.find(b=>b.id===log.readingBookId) : null;
         const screenT    = isWeekend(today) ? 4 : 3;
         const screenH    = parseFloat(log.screenTime)||0;
         const screenGood = screenH > 0 && screenH <= screenT;
-        const goalsHit   = [log.gym, studyH>=studyT, workH>0, (log.pagesRead||0)>0, log.weight!==null, screenGood].filter(Boolean).length;
+        const goalsHit   = [(log.gym||log.running), studyH>=studyT, workH>0, (log.pagesRead||0)>0, log.weight!==null, screenGood].filter(Boolean).length;
 
         const { hit: goalHit, total: goalTotal } = dailyGoalsHit(log, cfg, today);
 
@@ -716,10 +726,10 @@
                         <button onClick={openEdit} className="text-xs text-blue-500 hover:text-blue-700 font-medium">Edit targets</button>
                     </div>
                     <div className="divide-y divide-slate-50">
-                        {/* Gym */}
+                        {/* Gym/Run */}
                         <div className="flex items-center justify-between px-5 py-3">
-                            <div className="flex items-center gap-2"><span className="text-base">🏋️</span><span className="text-sm text-slate-700">Gym</span></div>
-                            <span className={`text-sm font-semibold ${log.gym?'text-emerald-600':'text-slate-300'}`}>{log.gym?'✓':'–'}</span>
+                            <div className="flex items-center gap-2"><span className="text-base">🏋️🏃</span><span className="text-sm text-slate-700">Gym/Run</span></div>
+                            <span className={`text-sm font-semibold ${(log.gym||log.running)?'text-emerald-600':'text-slate-300'}`}>{(log.gym||log.running)?'✓':'–'}</span>
                         </div>
                         {(cfg.runKm||0)>0 && <div className="flex items-center justify-between px-5 py-3">
                             <div className="flex items-center gap-2"><span className="text-base">🏃</span><span className="text-sm text-slate-700">Run {cfg.runKm} km</span></div>
@@ -898,7 +908,7 @@
                                         {activeBooks.map(b=><option key={b.id} value={b.id}>{b.title}</option>)}
                                     </select>
                                     <div className="flex gap-2 items-center">
-                                        <input type="number" min="0" max="500" value={pagesInput} onChange={e=>setPagesInput(e.target.value)}
+                                        <input ref={pagesInputRef} type="number" min="0" max="500" value={pagesInput} onChange={e=>setPagesInput(e.target.value)}
                                             onKeyDown={e=>e.key==='Enter'&&saveReading()} placeholder="Pages today"
                                             className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500"/>
                                         <span className="text-sm text-slate-400">pages</span>
@@ -1454,6 +1464,14 @@
             save({...data,books:data.books.map(b=>b.id===bookId?{...b,currentPage:np,finishedDate:done&&!b.finishedDate?fmtDate(new Date()):b.finishedDate}:b),currentBookId:done&&data.currentBookId===bookId?null:data.currentBookId});
             setPageInputs(p=>({...p,[bookId]:''}));
         };
+        const deleteBook = bookId => {
+            if(!confirm('Delete this book? This will also remove all daily reading logs for this book.')) return;
+            const newBooks = data.books.filter(b=>b.id!==bookId);
+            const newLogs = Object.fromEntries(
+                Object.entries(data.dailyLogs).map(([d,l])=>[d, l.readingBookId===bookId ? {...l,readingBookId:null,pagesRead:0} : l])
+            );
+            save({...data, books:newBooks, dailyLogs:newLogs, currentBookId:data.currentBookId===bookId?null:data.currentBookId});
+        };
 
         return (
             <div className="space-y-5">
@@ -1516,7 +1534,10 @@
                                     className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500"/>
                                 <button onClick={()=>setPage(book.id)} className="px-4 py-2.5 bg-amber-500 text-white text-sm rounded-xl font-medium hover:bg-amber-600 transition">Set</button>
                             </div>
-                            <p className="text-xs text-slate-400 mt-1.5">Log pages in the Log tab to auto-update progress.</p>
+                            <div className="flex justify-between items-center mt-2">
+                                <p className="text-xs text-slate-400">Log pages in the Log tab to auto-update progress.</p>
+                                <button onClick={()=>deleteBook(book.id)} className="text-xs text-red-500 hover:text-red-700 transition">🗑️ Delete</button>
+                            </div>
                         </div>
                     );
                 })}
@@ -1546,9 +1567,12 @@
                         <p className="font-semibold text-slate-800 mb-3">✅ Finished — {finished.length} book{finished.length>1?'s':''}</p>
                         <div className="space-y-2">
                             {finished.map(b=>(
-                                <div key={b.id} className="flex items-center gap-3 p-2">
-                                    <span className="text-lg">📗</span>
-                                    <div><p className="text-sm font-medium text-slate-700">{b.title}</p><p className="text-xs text-slate-400">Finished {b.finishedDate} · {b.totalPages} pages</p></div>
+                                <div key={b.id} className="flex items-center justify-between gap-3 p-2">
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-lg">📗</span>
+                                        <div><p className="text-sm font-medium text-slate-700">{b.title}</p><p className="text-xs text-slate-400">Finished {b.finishedDate} · {b.totalPages} pages</p></div>
+                                    </div>
+                                    <button onClick={()=>deleteBook(b.id)} className="text-xs text-red-500 hover:text-red-700 transition px-2">🗑️</button>
                                 </div>
                             ))}
                         </div>
