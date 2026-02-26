@@ -530,18 +530,18 @@
                 <div className="bg-white rounded-2xl p-5 border border-slate-100">
                     <div className="flex justify-between items-end mb-3">
                         <div><p className="font-bold text-slate-800 text-lg">Passion Project</p><p className="text-xs text-slate-400">Feb 26 – Aug 31, 2026</p></div>
-                        <div className="text-right"><span className="text-3xl font-bold text-slate-900">{pct}%</span><p className="text-xs text-slate-400">Day {challDay}/{TOTAL_DAYS}</p></div>
+                        <div className="text-right"><span className="text-3xl font-bold text-blue-600">{pct}%</span><p className="text-xs text-slate-400">Day {challDay}/{TOTAL_DAYS}</p></div>
                     </div>
-                    <div className="bg-slate-100 rounded-full h-3"><div className="bg-slate-900 rounded-full h-3 transition-all" style={{width:`${pct}%`}}/></div>
+                    <div className="bg-slate-100 rounded-full h-3"><div className="bg-blue-600 rounded-full h-3 transition-all" style={{width:`${pct}%`}}/></div>
                     {/* Period summary pills */}
                     <div className="flex gap-2 mt-4 flex-wrap">
-                        <button onClick={()=>navigate('goals','daily')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${todayHit===todayTotal&&todayTotal>0?'bg-emerald-50 border-emerald-200 text-emerald-700':'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-400'}`}>
+                        <button onClick={()=>navigate('goals','daily')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${todayHit===todayTotal&&todayTotal>0?'bg-emerald-50 border-emerald-200 text-emerald-700':'bg-slate-50 border-slate-200 text-slate-600 hover:border-blue-300'}`}>
                             📝 Today {todayTotal>0?`${todayHit}/${todayTotal}`:'→ set goals'}
                         </button>
-                        <button onClick={()=>navigate('goals','weekly')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${wkTotal>0&&wkHit===wkTotal?'bg-emerald-50 border-emerald-200 text-emerald-700':'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-400'}`}>
+                        <button onClick={()=>navigate('goals','weekly')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${wkTotal>0&&wkHit===wkTotal?'bg-emerald-50 border-emerald-200 text-emerald-700':'bg-slate-50 border-slate-200 text-slate-600 hover:border-blue-300'}`}>
                             📅 This week {wkTotal>0?`${wkHit}/${wkTotal}`:'→ set targets'}
                         </button>
-                        <button onClick={()=>navigate('goals','monthly')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${mTotal>0&&mHit===mTotal?'bg-emerald-50 border-emerald-200 text-emerald-700':'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-400'}`}>
+                        <button onClick={()=>navigate('goals','monthly')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${mTotal>0&&mHit===mTotal?'bg-emerald-50 border-emerald-200 text-emerald-700':'bg-slate-50 border-slate-200 text-slate-600 hover:border-blue-300'}`}>
                             🗓 This month {mTotal>0?`${mHit}/${mTotal}`:'→ set targets'}
                         </button>
                     </div>
@@ -630,11 +630,11 @@
                             </div>
                         </div>
                     ) : (
-                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 flex items-center gap-4">
+                        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 flex items-center gap-4">
                             <span className="text-5xl">🎯</span>
                             <div>
-                                <p className="font-semibold text-slate-700">Start your streak</p>
-                                <p className="text-sm text-slate-500 mt-1">Log {isWeekend(today)?'5':'3'}h of study today to get the fire going.</p>
+                                <p className="font-semibold text-blue-700">Start your streak</p>
+                                <p className="text-sm text-blue-500 mt-1">Log {isWeekend(today)?'5':'3'}h of study today to get the fire going.</p>
                             </div>
                         </div>
                     )}
