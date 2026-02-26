@@ -19,12 +19,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <style>
         html, body { overflow-x: hidden; max-width: 100vw; }
-        body {
-            font-family: 'Georgia', 'Times New Roman', serif;
-            padding-bottom: env(safe-area-inset-bottom);
-            background-color: #faf8f5;
-            color: #2d2d2d;
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding-bottom: env(safe-area-inset-bottom); }
         input[type=number]::-webkit-inner-spin-button { opacity: 1; }
         * { box-sizing: border-box; }
         img { max-width: 100%; height: auto; }
@@ -42,7 +37,7 @@
             right: 16px;
         }
         /* Dark mode */
-        .dark body                          { background-color: #1a1816; color: #e8e6e3; }
+        .dark body                          { background-color: #020617; }
         .dark .bg-slate-50                  { background-color: #020617 !important; }
         .dark .bg-white                     { background-color: #1e293b !important; }
         .dark .bg-slate-100                 { background-color: #334155 !important; }
@@ -532,28 +527,28 @@
         return (
             <div className="space-y-5">
                 {/* Progress bar */}
-                <div className="bg-white rounded-2xl p-6 border border-stone-200">
-                    <div className="flex justify-between items-end mb-4">
-                        <div><p className="font-bold text-stone-800 text-xl" style={{fontFamily: 'Georgia, serif'}}>Passion Project</p><p className="text-sm text-stone-500 mt-1">Feb 26 – Aug 31, 2026</p></div>
-                        <div className="text-right"><span className="text-4xl font-bold text-stone-800">{pct}%</span><p className="text-sm text-stone-500 mt-1">Day {challDay}/{TOTAL_DAYS}</p></div>
+                <div className="bg-white rounded-2xl p-5 border border-slate-100">
+                    <div className="flex justify-between items-end mb-3">
+                        <div><p className="font-bold text-slate-800 text-lg">Passion Project</p><p className="text-xs text-slate-400">Feb 26 – Aug 31, 2026</p></div>
+                        <div className="text-right"><span className="text-3xl font-bold text-blue-600">{pct}%</span><p className="text-xs text-slate-400">Day {challDay}/{TOTAL_DAYS}</p></div>
                     </div>
-                    <div className="bg-stone-200 rounded-full h-2"><div className="bg-stone-700 rounded-full h-2 transition-all" style={{width:`${pct}%`}}/></div>
+                    <div className="bg-slate-100 rounded-full h-3"><div className="bg-blue-600 rounded-full h-3 transition-all" style={{width:`${pct}%`}}/></div>
                     {/* Period summary pills */}
-                    <div className="flex gap-2 mt-5 flex-wrap">
-                        <button onClick={()=>navigate('goals','daily')} className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium border transition-colors ${todayHit===todayTotal&&todayTotal>0?'bg-stone-100 border-stone-300 text-stone-800':'bg-white border-stone-200 text-stone-600 hover:border-stone-400'}`}>
+                    <div className="flex gap-2 mt-4 flex-wrap">
+                        <button onClick={()=>navigate('goals','daily')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${todayHit===todayTotal&&todayTotal>0?'bg-emerald-50 border-emerald-200 text-emerald-700':'bg-slate-50 border-slate-200 text-slate-600 hover:border-blue-300'}`}>
                             📝 Today {todayTotal>0?`${todayHit}/${todayTotal}`:'→ set goals'}
                         </button>
-                        <button onClick={()=>navigate('goals','weekly')} className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium border transition-colors ${wkTotal>0&&wkHit===wkTotal?'bg-stone-100 border-stone-300 text-stone-800':'bg-white border-stone-200 text-stone-600 hover:border-stone-400'}`}>
+                        <button onClick={()=>navigate('goals','weekly')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${wkTotal>0&&wkHit===wkTotal?'bg-emerald-50 border-emerald-200 text-emerald-700':'bg-slate-50 border-slate-200 text-slate-600 hover:border-blue-300'}`}>
                             📅 This week {wkTotal>0?`${wkHit}/${wkTotal}`:'→ set targets'}
                         </button>
-                        <button onClick={()=>navigate('goals','monthly')} className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium border transition-colors ${mTotal>0&&mHit===mTotal?'bg-stone-100 border-stone-300 text-stone-800':'bg-white border-stone-200 text-stone-600 hover:border-stone-400'}`}>
+                        <button onClick={()=>navigate('goals','monthly')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${mTotal>0&&mHit===mTotal?'bg-emerald-50 border-emerald-200 text-emerald-700':'bg-slate-50 border-slate-200 text-slate-600 hover:border-blue-300'}`}>
                             🗓 This month {mTotal>0?`${mHit}/${mTotal}`:'→ set targets'}
                         </button>
                     </div>
                 </div>
 
                 {/* 5 Life Goal cards */}
-                <p className="text-sm font-medium text-stone-500 uppercase tracking-wide">Life Goals</p>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Life Goals</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
 
                     {/* ISB */}
@@ -561,9 +556,9 @@
                         <div className="text-2xl">🎓</div>
                         <div className="font-bold text-sm mt-1">ISB 2026</div>
                         <div className="text-3xl font-bold mt-1">{streak>0?streak:studyDays}</div>
-                        <div className="text-xs opacity-60">{streak>0?'day streak 🔥':'study days ✓'}</div>
+                        <div className="text-xs opacity-75">{streak>0?'day streak 🔥':'study days ✓'}</div>
                         <MiniBar pct={(studyDays/TOTAL_DAYS)*100}/>
-                        <div className="text-xs opacity-40 mt-1">Tap for details →</div>
+                        <div className="text-xs opacity-50 mt-1">Tap for details →</div>
                     </ClickCard>
 
                     {/* Fitness */}
@@ -573,14 +568,14 @@
                         {latestW ? (<>
                             <div className="text-3xl font-bold mt-1">{latestW}<span className="text-base font-normal"> kg</span></div>
                             {daysToHyrox > 0
-                                ? <div className="text-xs opacity-60">🏁 Hyrox in {daysToHyrox}d · need ≤{HYROX_WEIGHT} kg</div>
-                                : <div className="text-xs opacity-60">→ 78 kg by July · {daysToJuly}d to go</div>
+                                ? <div className="text-xs opacity-75">🏁 Hyrox in {daysToHyrox}d · need ≤{HYROX_WEIGHT} kg</div>
+                                : <div className="text-xs opacity-75">→ 78 kg by July · {daysToJuly}d to go</div>
                             }
                         </>) : (<>
-                            <div className="text-lg font-semibold mt-2 opacity-70">Log weight</div>
-                            <div className="text-xs opacity-50">🏁 Hyrox Apr 12 · need ≤{HYROX_WEIGHT} kg</div>
+                            <div className="text-lg font-semibold mt-2 opacity-80">Log weight</div>
+                            <div className="text-xs opacity-60">🏁 Hyrox Apr 12 · need ≤{HYROX_WEIGHT} kg</div>
                         </>)}
-                        <div className="text-xs opacity-40 mt-1">Tap for details →</div>
+                        <div className="text-xs opacity-50 mt-1">Tap for details →</div>
                     </ClickCard>
 
                     {/* Work */}
@@ -588,8 +583,8 @@
                         <div className="text-2xl">💼</div>
                         <div className="font-bold text-sm mt-1">Work First</div>
                         <div className="text-3xl font-bold mt-1">{workWk.toFixed(1)}<span className="text-base font-normal">h</span></div>
-                        <div className="text-xs opacity-60">focused this week</div>
-                        <div className="text-xs opacity-40 mt-1">Tap for details →</div>
+                        <div className="text-xs opacity-75">focused this week</div>
+                        <div className="text-xs opacity-50 mt-1">Tap for details →</div>
                     </ClickCard>
 
                     {/* Reading */}
@@ -598,13 +593,13 @@
                         <div className="font-bold text-sm mt-1">Reading</div>
                         {curBook ? (<>
                             <div className="font-semibold text-sm mt-1 leading-tight truncate">{curBook.title}</div>
-                            <div className="text-xs opacity-60">p.{curBook.currentPage}/{curBook.totalPages}</div>
+                            <div className="text-xs opacity-75">p.{curBook.currentPage}/{curBook.totalPages}</div>
                             <MiniBar pct={(curBook.currentPage/curBook.totalPages)*100}/>
                         </>) : (<>
                             <div className="text-3xl font-bold mt-1">{totalPages}</div>
-                            <div className="text-xs opacity-60">pages · {booksFinished} books done</div>
+                            <div className="text-xs opacity-75">pages · {booksFinished} books done</div>
                         </>)}
-                        <div className="text-xs opacity-40 mt-1">Tap for details →</div>
+                        <div className="text-xs opacity-50 mt-1">Tap for details →</div>
                     </ClickCard>
 
                     {/* Wealth */}
@@ -613,39 +608,39 @@
                         <div className="font-bold text-sm mt-1">₹6L Net Worth</div>
                         {nw!==null ? (<>
                             <div className="text-2xl font-bold mt-1">{fmtMoney(nw,privacy)}</div>
-                            <div className="text-xs opacity-60">{((nw/NW_GOAL)*100).toFixed(0)}% of goal</div>
+                            <div className="text-xs opacity-75">{((nw/NW_GOAL)*100).toFixed(0)}% of goal</div>
                             <MiniBar pct={(nw/NW_GOAL)*100}/>
                         </>) : (<>
-                            <div className="text-sm font-semibold mt-2 opacity-70">Log first entry</div>
-                            <div className="text-xs opacity-50">bimonthly tracking</div>
+                            <div className="text-sm font-semibold mt-2 opacity-80">Log first entry</div>
+                            <div className="text-xs opacity-60">bimonthly tracking</div>
                         </>)}
-                        <div className="text-xs opacity-40 mt-1">Tap for details →</div>
+                        <div className="text-xs opacity-50 mt-1">Tap for details →</div>
                     </ClickCard>
                 </div>
 
                 {/* Streak + Quote */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {streak > 0 ? (
-                        <div className="bg-white border border-stone-200 rounded-2xl p-6 flex items-center gap-4">
+                        <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5 flex items-center gap-4">
                             <span className="text-5xl">🔥</span>
                             <div>
-                                <p className="text-4xl font-bold text-stone-800">{streak}</p>
-                                <p className="font-semibold text-stone-700">Day Study Streak</p>
-                                <p className="text-sm text-stone-500 mt-1">Keep it alive — log today.</p>
+                                <p className="text-3xl font-bold text-orange-700">{streak}</p>
+                                <p className="font-semibold text-orange-700">Day Study Streak</p>
+                                <p className="text-xs text-orange-400 mt-0.5">Keep it alive — log today.</p>
                             </div>
                         </div>
                     ) : (
-                        <div className="bg-white border border-stone-200 rounded-2xl p-6 flex items-center gap-4">
+                        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 flex items-center gap-4">
                             <span className="text-5xl">🎯</span>
                             <div>
-                                <p className="font-semibold text-stone-700">Start your streak</p>
-                                <p className="text-sm text-stone-500 mt-1">Log {isWeekend(today)?'5':'3'}h of study today to get the fire going.</p>
+                                <p className="font-semibold text-blue-700">Start your streak</p>
+                                <p className="text-sm text-blue-500 mt-1">Log {isWeekend(today)?'5':'3'}h of study today to get the fire going.</p>
                             </div>
                         </div>
                     )}
-                    <div className="bg-stone-800 text-stone-100 rounded-2xl p-6 flex flex-col justify-center">
-                        <p className="text-base italic leading-relaxed" style={{fontFamily: 'Georgia, serif'}}>"We are what we repeatedly do. Excellence, then, is not an act but a habit."</p>
-                        <p className="text-sm opacity-60 mt-3">— Aristotle</p>
+                    <div className="bg-slate-800 text-white rounded-2xl p-5 flex flex-col justify-center">
+                        <p className="text-sm italic opacity-90 leading-relaxed">"We are what we repeatedly do. Excellence, then, is not an act but a habit."</p>
+                        <p className="text-xs opacity-40 mt-3">— Aristotle</p>
                     </div>
                 </div>
             </div>
@@ -654,9 +649,9 @@
 
     function ClickCard({ dotColor, onClick, children }) {
         return (
-            <div onClick={onClick} className="relative bg-white rounded-2xl p-5 cursor-pointer hover:shadow-lg transition-all active:scale-95 border border-stone-200">
+            <div onClick={onClick} className="relative bg-white rounded-2xl p-5 cursor-pointer hover:shadow-lg transition-all active:scale-95 border border-slate-200">
                 <div className="color-dot" style={{backgroundColor: dotColor}}></div>
-                <div className="text-stone-800">
+                <div className="text-slate-800">
                     {children}
                 </div>
             </div>
