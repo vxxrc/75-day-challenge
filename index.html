@@ -388,8 +388,8 @@
                             <h1 className="text-lg font-bold text-slate-800">Passion Project</h1>
                             <p className="text-xs text-slate-400 mt-0.5">{today < CHALLENGE_START ? '🚀 Starts tomorrow — Feb 26' : `Day ${challDay} of ${TOTAL_DAYS}`} · {new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'})}</p>
                         </div>
-                        <button onClick={()=>setMenuOpen(o=>!o)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-blue-100 hover:bg-blue-200 transition">
-                            <span className="text-2xl">⚙️</span>
+                        <button onClick={()=>setMenuOpen(o=>!o)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 transition">
+                            <span className="text-lg font-medium text-slate-700">:)</span>
                         </button>
                         {menuOpen && (
                             <div className="absolute right-4 top-full mt-1 w-64 bg-white rounded-2xl shadow-xl border border-slate-100 z-50 overflow-hidden">
