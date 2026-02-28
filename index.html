@@ -102,7 +102,7 @@
 <body class="bg-slate-50">
 <div id="root"></div>
 <script type="text/babel">
-    const { useState, useEffect, useRef, useCallback } = React;
+    const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
     const CHALLENGE_START = '2026-02-26';
     const TOTAL_DAYS      = 189;
@@ -272,6 +272,28 @@
             load();
         }, []);
 
+        // Real-time sync listener
+        useEffect(() => {
+            if (!userIdRef.current || !data) return;
+
+            const unsubscribe = _db.collection('users').doc(userIdRef.current).onSnapshot(
+                doc => {
+                    if (doc.exists && doc.metadata.hasPendingWrites === false) {
+                        const cloud = doc.data();
+                        setData(prev => {
+                            const merged = mergeData(prev, cloud);
+                            localStorage.setItem('6mc-v2', JSON.stringify(merged));
+                            return merged;
+                        });
+                        setSyncStatus('synced');
+                    }
+                },
+                () => setSyncStatus('offline')
+            );
+
+            return () => unsubscribe();
+        }, [data ? data.dailyGoalConfig : null]);
+
         const doSetup = async () => {
             const id = passInput.trim().toLowerCase().replace(/\s+/g, '-');
             if (id.length < 4) { setSetupErr('Enter at least 4 characters'); return; }
@@ -295,6 +317,44 @@
             setData(empty);
             setShowSetup(false);
             setResetConfirm(false);
+        };
+
+        const exportData = () => {
+            const dataStr = JSON.stringify(data, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `passion-project-backup-${today}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            setMenuOpen(false);
+        };
+
+        const importData = () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'application/json';
+            input.onchange = e => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = evt => {
+                    try {
+                        const imported = JSON.parse(evt.target.result);
+                        const merged = mergeData(data, imported);
+                        persist(merged);
+                        alert('✅ Data imported and merged successfully!');
+                    } catch (err) {
+                        alert('❌ Error importing data: ' + err.message);
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+            setMenuOpen(false);
         };
 
         const persist = useCallback(nd => {
@@ -422,6 +482,16 @@
                                     <span className="text-sm font-medium text-slate-700">Hide numbers</span>
                                     <span className="text-sm">{privacy ? '🙈 On' : '👁 Off'}</span>
                                 </button>
+                                {/* Export */}
+                                <button onClick={exportData} className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition border-b border-slate-100">
+                                    <span className="text-sm font-medium text-slate-700">Export backup</span>
+                                    <span className="text-sm">📥</span>
+                                </button>
+                                {/* Import */}
+                                <button onClick={importData} className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition border-b border-slate-100">
+                                    <span className="text-sm font-medium text-slate-700">Import & merge</span>
+                                    <span className="text-sm">📤</span>
+                                </button>
                                 {/* Reset */}
                                 <button onClick={()=>{setMenuOpen(false);setResetConfirm(false);setShowSetup(true);}} className="w-full flex items-center px-5 py-4 hover:bg-red-50 transition">
                                     <span className="text-sm font-medium text-red-500">🗑 Reset all data</span>
@@ -482,47 +552,81 @@
     function Dashboard({ data, today, challDay, privacy, navigate }) {
         const logs = data.dailyLogs;
         const ws   = getWeekStart(today);
-        const wDates = getWeekDates(ws);
+        const wDates = useMemo(() => getWeekDates(ws), [ws]);
         const monthKey = today.slice(0,7);
 
-        // ISB
-        let streak = 0;
-        { const cd=new Date(parseD(today)); for(let i=0;i<200;i++){const ds=fmtDate(cd);const h=parseFloat(logs[ds]?.studyHours)||0;if(h>=(isWeekend(ds)?5:3)){streak++;cd.setDate(cd.getDate()-1);}else break;} }
-        const studyDays = Object.keys(logs).filter(d=>d>=CHALLENGE_START).filter(d=>{const h=parseFloat(logs[d]?.studyHours)||0;return isWeekend(d)?h>=5:h>=3;}).length;
+        // ISB - Memoized calculations
+        const streak = useMemo(() => {
+            let s = 0;
+            const cd = new Date(parseD(today));
+            for (let i = 0; i < 200; i++) {
+                const ds = fmtDate(cd);
+                const h = parseFloat(logs[ds]?.studyHours) || 0;
+                if (h >= (isWeekend(ds) ? 5 : 3)) {
+                    s++;
+                    cd.setDate(cd.getDate() - 1);
+                } else break;
+            }
+            return s;
+        }, [logs, today]);
 
-        // Fitness
-        const wEntries = Object.entries(logs).filter(([_,l])=>l.weight).sort(([a],[b])=>a<b?-1:1);
-        const latestW  = wEntries.length ? wEntries[wEntries.length-1][1].weight : null;
-        const daysToJuly  = Math.max(0,daysBetween(today,'2026-07-01'));
-        const daysToHyrox = Math.max(0,daysBetween(today,HYROX_DATE));
+        const studyDays = useMemo(() =>
+            Object.keys(logs).filter(d => d >= CHALLENGE_START).filter(d => {
+                const h = parseFloat(logs[d]?.studyHours) || 0;
+                return isWeekend(d) ? h >= 5 : h >= 3;
+            }).length,
+        [logs]);
 
-        // Work
-        const workWk = wDates.reduce((s,d)=>s+(parseFloat(logs[d]?.workHours)||0),0);
+        // Fitness - Memoized calculations
+        const latestW = useMemo(() => {
+            const wEntries = Object.entries(logs).filter(([_, l]) => l.weight).sort(([a], [b]) => a < b ? -1 : 1);
+            return wEntries.length ? wEntries[wEntries.length - 1][1].weight : null;
+        }, [logs]);
 
-        // Reading
-        const curBook      = data.books.find(b=>b.id===data.currentBookId);
-        const totalPages   = Object.values(logs).reduce((s,l)=>s+(l.pagesRead||0),0);
-        const booksFinished= data.books.filter(b=>b.finishedDate).length;
+        const daysToJuly = Math.max(0, daysBetween(today, '2026-07-01'));
+        const daysToHyrox = Math.max(0, daysBetween(today, HYROX_DATE));
 
-        // Wealth
-        const nwLogs   = [...(data.netWorthLogs||[])].sort((a,b)=>a.date<b.date?-1:1);
-        const latestNW = nwLogs.length ? nwLogs[nwLogs.length-1] : null;
-        const nw       = latestNW ? calcNW(latestNW) : null;
+        // Work - Memoized
+        const workWk = useMemo(() =>
+            wDates.reduce((s, d) => s + (parseFloat(logs[d]?.workHours) || 0), 0),
+        [wDates, logs]);
 
-        // Today goals summary
-        const tl = logs[today]||emptyDay();
-        const cfg = data.dailyGoalConfig || initData().dailyGoalConfig;
-        const { hit: todayHit, total: todayTotal } = dailyGoalsHit(tl, cfg, today);
+        // Reading - Memoized calculations
+        const curBook = useMemo(() =>
+            data.books.find(b => b.id === data.currentBookId),
+        [data.books, data.currentBookId]);
 
-        // Weekly goals summary
-        const wg = data.weeklyGoals?.[ws];
-        const { hit: wkHit, total: wkTotal } = weekGoalsHit(logs, ws, wg);
+        const totalPages = useMemo(() =>
+            Object.values(logs).reduce((s, l) => s + (l.pagesRead || 0), 0),
+        [logs]);
 
-        // Monthly goals summary
-        const mg = data.monthlyGoals?.[monthKey];
-        const { hit: mHit, total: mTotal } = monthGoalsHit(logs, monthKey, mg);
+        const booksFinished = useMemo(() =>
+            data.books.filter(b => b.finishedDate).length,
+        [data.books]);
 
-        const pct = Math.min(100,((challDay/TOTAL_DAYS)*100)).toFixed(0);
+        // Wealth - Memoized calculations
+        const nw = useMemo(() => {
+            const nwLogs = [...(data.netWorthLogs || [])].sort((a, b) => a.date < b.date ? -1 : 1);
+            const latestNW = nwLogs.length ? nwLogs[nwLogs.length - 1] : null;
+            return latestNW ? calcNW(latestNW) : null;
+        }, [data.netWorthLogs]);
+
+        // Goals summary - Memoized
+        const { todayHit, todayTotal, wkHit, wkTotal, mHit, mTotal } = useMemo(() => {
+            const tl = logs[today] || emptyDay();
+            const cfg = data.dailyGoalConfig || initData().dailyGoalConfig;
+            const { hit: todayHit, total: todayTotal } = dailyGoalsHit(tl, cfg, today);
+
+            const wg = data.weeklyGoals?.[ws];
+            const { hit: wkHit, total: wkTotal } = weekGoalsHit(logs, ws, wg);
+
+            const mg = data.monthlyGoals?.[monthKey];
+            const { hit: mHit, total: mTotal } = monthGoalsHit(logs, monthKey, mg);
+
+            return { todayHit, todayTotal, wkHit, wkTotal, mHit, mTotal };
+        }, [logs, today, ws, monthKey, data.dailyGoalConfig, data.weeklyGoals, data.monthlyGoals]);
+
+        const pct = Math.min(100, ((challDay / TOTAL_DAYS) * 100)).toFixed(0);
 
         return (
             <div className="space-y-5">
