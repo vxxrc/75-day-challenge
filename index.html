@@ -626,7 +626,17 @@
             return { todayHit, todayTotal, wkHit, wkTotal, mHit, mTotal };
         }, [logs, today, ws, monthKey, data.dailyGoalConfig, data.weeklyGoals, data.monthlyGoals]);
 
-        const pct = Math.min(100, ((challDay / TOTAL_DAYS) * 100)).toFixed(0);
+        // Progress based on days with goals completed
+        const daysCompleted = useMemo(() => {
+            const cfg = data.dailyGoalConfig || initData().dailyGoalConfig;
+            return Object.keys(logs).filter(date => {
+                const log = logs[date];
+                const { hit, total } = dailyGoalsHit(log, cfg, date);
+                return total > 0 && hit === total; // Count days where all goals were hit
+            }).length;
+        }, [logs, data.dailyGoalConfig]);
+
+        const pct = Math.min(100, ((daysCompleted / TOTAL_DAYS) * 100)).toFixed(0);
 
         return (
             <div className="space-y-5">
@@ -634,7 +644,7 @@
                 <div className="bg-white rounded-2xl p-5 border border-slate-100">
                     <div className="flex justify-between items-end mb-3">
                         <div><p className="font-bold text-slate-800 text-lg">Passion Project</p><p className="text-xs text-slate-400">Feb 26 – Aug 31, 2026</p></div>
-                        <div className="text-right"><span className="text-3xl font-bold text-blue-600">{pct}%</span><p className="text-xs text-slate-400">Day {challDay}/{TOTAL_DAYS}</p></div>
+                        <div className="text-right"><span className="text-3xl font-bold text-blue-600">{pct}%</span><p className="text-xs text-slate-400">{daysCompleted} days completed</p></div>
                     </div>
                     <div className="bg-slate-100 rounded-full h-3"><div className="bg-blue-600 rounded-full h-3 transition-all" style={{width:`${pct}%`}}/></div>
                     {/* Period summary pills */}
