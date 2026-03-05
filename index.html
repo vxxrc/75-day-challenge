@@ -194,7 +194,7 @@
         return { hit, total };
     }
 
-    const emptyDay = () => ({ gym:false,running:false,greenTea:false,outsideFood:false,cheatMeal:false,weight:null,studyHours:0,workHours:0,pagesRead:0,readingBookId:null,screenTime:0,runKm:0,runSpeed:0 });
+    const emptyDay = () => ({ gym:false,running:false,greenTea:false,outsideFood:false,cheatMeal:false,weight:null,studyHours:0,workHours:0,pagesRead:0,readingBookId:null,screenTime:0,runKm:0,runSpeed:0,goodChoices:'',badChoices:'' });
     const initData = () => ({
         dailyLogs:{}, books:[], currentBookId:null, monthlyNotes:{}, netWorthLogs:[],
         dailyGoalConfig: { gym:true, runKm:0, studyHours:3, pagesRead:20, custom:[] },
@@ -1050,6 +1050,41 @@
                             <div className="text-4xl mb-1">{goalsHit===6?'🔥':goalsHit>=4?'💪':'⏳'}</div>
                             <p className={`text-2xl font-bold ${goalsHit>=5?'text-emerald-700':goalsHit>=3?'text-amber-700':'text-slate-500'}`}>{goalsHit}<span className="text-base font-normal text-slate-400">/6</span></p>
                             <p className="text-xs text-slate-400 mt-1">{goalsHit===6?'Perfect day. Absolutely elite.':goalsHit>=4?'Solid. Push one more.':'Every bit counts. Keep moving.'}</p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Daily Reflection - Good & Bad Choices */}
+                <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+                    <div className="px-5 py-4 border-b border-slate-100">
+                        <h3 className="font-semibold text-slate-800">📝 Daily Reflection</h3>
+                        <p className="text-xs text-slate-400 mt-0.5">Track your good and bad choices to learn from each day</p>
+                    </div>
+                    <div className="p-5 space-y-4">
+                        {/* Good Choices */}
+                        <div>
+                            <label className="block text-sm font-medium text-emerald-700 mb-2">✅ Good Choices</label>
+                            <textarea
+                                value={log.goodChoices || ''}
+                                onChange={e => updateDay(today, { goodChoices: e.target.value })}
+                                placeholder="What went well today? What good decisions did you make?&#10;• Example: Chose healthy lunch over fast food&#10;• Example: Finished work project ahead of deadline&#10;• Example: Went to gym even though tired"
+                                rows="4"
+                                className="w-full border border-emerald-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-emerald-500 resize-none placeholder:text-slate-300"
+                            />
+                            {log.goodChoices && <p className="text-xs text-emerald-600 mt-1">✓ Logged</p>}
+                        </div>
+
+                        {/* Bad Choices */}
+                        <div>
+                            <label className="block text-sm font-medium text-red-600 mb-2">❌ Bad Choices</label>
+                            <textarea
+                                value={log.badChoices || ''}
+                                onChange={e => updateDay(today, { badChoices: e.target.value })}
+                                placeholder="What could have been better? What would you change?&#10;• Example: Stayed up too late scrolling&#10;• Example: Skipped morning workout&#10;• Example: Procrastinated on important task"
+                                rows="4"
+                                className="w-full border border-red-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-500 resize-none placeholder:text-slate-300"
+                            />
+                            {log.badChoices && <p className="text-xs text-red-600 mt-1">✓ Logged</p>}
                         </div>
                     </div>
                 </div>
