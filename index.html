@@ -97,6 +97,45 @@
                 .then(function(doc) { return doc.exists ? doc.data() : null; })
                 .catch(function() { return null; });
         };
+
+        // ── PERSONAL FINANCE FIREBASE CONNECTION ──────────────────────────────
+        const financeFirebaseConfig = {
+            apiKey: "AIzaSyBg62bcGlGUx5e2SXA8SbWBec5OErEBSrI",
+            authDomain: "personal-finance-app-490c6.firebaseapp.com",
+            projectId: "personal-finance-app-490c6",
+            storageBucket: "personal-finance-app-490c6.firebasestorage.app",
+            messagingSenderId: "788323641848",
+            appId: "1:788323641848:web:e1cff3538670d62be88e0d"
+        };
+        const financeApp = firebase.initializeApp(financeFirebaseConfig, 'financeApp');
+        const financeDb = financeApp.firestore();
+
+        // Fetch net worth from personal finance app
+        window._fetchNetWorthFromFinanceApp = async function() {
+            try {
+                const profileDoc = await financeDb.collection('profiles').doc('default').get();
+                if (profileDoc.exists) {
+                    const profile = profileDoc.data();
+                    const bankBalance = profile.bankBalance || 0;
+                    const stocksValue = profile.stocksValue || 0;
+                    const cryptoValue = profile.cryptoValue || 0;
+                    const creditCardDue = profile.creditCardDue || 0;
+                    const netWorth = bankBalance + stocksValue + cryptoValue - creditCardDue;
+
+                    return {
+                        netWorth,
+                        bank: bankBalance,
+                        demat: stocksValue,
+                        crypto: cryptoValue,
+                        creditCard: creditCardDue
+                    };
+                }
+                return null;
+            } catch (error) {
+                console.error('Error fetching net worth from finance app:', error);
+                return null;
+            }
+        };
     </script>
 </head>
 <body class="bg-slate-50">
@@ -294,6 +333,66 @@
 
             return () => unsubscribe();
         }, [syncToken, !!data]);
+
+        // Auto-sync net worth from personal finance app daily
+        useEffect(() => {
+            if (!data) return;
+
+            const syncNetWorth = async () => {
+                try {
+                    const lastSyncDate = localStorage.getItem('nw-last-sync-date');
+                    if (lastSyncDate === today) {
+                        console.log('Net worth already synced today');
+                        return;
+                    }
+
+                    console.log('Fetching net worth from finance app...');
+                    const financeData = await window._fetchNetWorthFromFinanceApp();
+
+                    if (financeData) {
+                        const newEntry = {
+                            date: today,
+                            bank: financeData.bank,
+                            demat: financeData.demat,
+                            crypto: financeData.crypto,
+                            creditCard: financeData.creditCard
+                        };
+
+                        // Check if entry for today already exists
+                        const existingEntries = data.netWorthLogs || [];
+                        const hasToday = existingEntries.some(log => log.date === today);
+
+                        if (!hasToday) {
+                            const updatedData = {
+                                ...data,
+                                netWorthLogs: [...existingEntries, newEntry]
+                            };
+
+                            localStorage.setItem('6mc-v2', JSON.stringify(updatedData));
+                            setData(updatedData);
+
+                            if (userIdRef.current) {
+                                window._cloudSave(userIdRef.current, updatedData);
+                            }
+
+                            console.log('Net worth synced successfully:', financeData.netWorth);
+                        }
+
+                        localStorage.setItem('nw-last-sync-date', today);
+                    }
+                } catch (error) {
+                    console.error('Error syncing net worth:', error);
+                }
+            };
+
+            // Sync on component mount
+            syncNetWorth();
+
+            // Set up daily sync check (check every hour)
+            const interval = setInterval(syncNetWorth, 60 * 60 * 1000);
+
+            return () => clearInterval(interval);
+        }, [data, today]);
 
         const doSetup = async () => {
             const id = passInput.trim().toLowerCase().replace(/\s+/g, '-');
@@ -1833,6 +1932,7 @@
         const [showForm, setShowForm] = useState(false);
         const [form, setForm] = useState({date:fmtDate(new Date()),demat:'',crypto:'',bank:'',creditCard:''});
         const [editDate, setEditDate] = useState(null);
+        const [syncing, setSyncing] = useState(false);
 
         const latest = logs.length ? logs[logs.length-1] : null;
         const nw     = latest ? calcNW(latest) : null;
@@ -1861,11 +1961,40 @@
         const del = date => save({...data,netWorthLogs:(data.netWorthLogs||[]).filter(l=>l.date!==date)});
         const formNW=(parseFloat(form.demat)||0)+(parseFloat(form.crypto)||0)+(parseFloat(form.bank)||0)-(parseFloat(form.creditCard)||0);
 
+        const syncFromFinanceApp = async () => {
+            setSyncing(true);
+            try {
+                const financeData = await window._fetchNetWorthFromFinanceApp();
+                if (financeData) {
+                    const newEntry = {
+                        date: today,
+                        bank: financeData.bank,
+                        demat: financeData.demat,
+                        crypto: financeData.crypto,
+                        creditCard: financeData.creditCard
+                    };
+                    save({...data, netWorthLogs: [...(data.netWorthLogs || []).filter(l => l.date !== today), newEntry]});
+                    localStorage.setItem('nw-last-sync-date', today);
+                    alert(`Net worth synced successfully! ₹${(financeData.netWorth/100000).toFixed(2)}L`);
+                } else {
+                    alert('Unable to fetch data from finance app. Please try again.');
+                }
+            } catch (error) {
+                console.error('Error syncing:', error);
+                alert('Error syncing data. Check console for details.');
+            } finally {
+                setSyncing(false);
+            }
+        };
+
         return (
             <div className="space-y-5">
                 <div className="flex justify-between items-center">
-                    <div><h2 className="text-xl font-bold text-slate-800">💰 Net Worth</h2><p className="text-sm text-slate-400 mt-0.5">Goal: ₹6L by Aug 31, 2026</p></div>
-                    <button onClick={startAdd} className="px-4 py-2 bg-green-600 text-white text-sm rounded-xl font-medium hover:bg-green-700 transition">+ Log Entry</button>
+                    <div><h2 className="text-xl font-bold text-slate-800">💰 Net Worth</h2><p className="text-sm text-slate-400 mt-0.5">Goal: ₹6L by Aug 31, 2026 · Auto-synced daily</p></div>
+                    <div className="flex gap-2">
+                        <button onClick={syncFromFinanceApp} disabled={syncing} className="px-3 py-2 bg-blue-600 text-white text-xs rounded-xl font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed">{syncing ? '⏳ Syncing...' : '🔄 Sync Now'}</button>
+                        <button onClick={startAdd} className="px-4 py-2 bg-green-600 text-white text-sm rounded-xl font-medium hover:bg-green-700 transition">+ Log Entry</button>
+                    </div>
                 </div>
 
                 {/* Bimonthly reminder */}
