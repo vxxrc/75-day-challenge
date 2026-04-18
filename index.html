@@ -227,6 +227,8 @@
         const [resetConfirm, setResetConfirm] = useState(false);
         const [menuOpen, setMenuOpen]         = useState(false);
         const userIdRef = useRef(localStorage.getItem('pp-sync-id') || '');
+        const [syncToken, setSyncToken] = useState(() => localStorage.getItem('pp-sync-id') || '');
+        const lastLocalWriteRef = useRef(0);
         const today = fmtDate(new Date());
 
         useEffect(() => {
@@ -279,6 +281,7 @@
             const unsubscribe = _db.collection('users').doc(userIdRef.current).onSnapshot(
                 doc => {
                     if (doc.exists && doc.metadata.hasPendingWrites === false) {
+                        if (Date.now() - lastLocalWriteRef.current < 3000) return;
                         const cloud = doc.data();
                         setData(prev => {
                             const merged = mergeData(prev, cloud);
@@ -292,13 +295,14 @@
             );
 
             return () => unsubscribe();
-        }, [data ? data.dailyGoalConfig : null]);
+        }, [syncToken, !!data]);
 
         const doSetup = async () => {
             const id = passInput.trim().toLowerCase().replace(/\s+/g, '-');
             if (id.length < 4) { setSetupErr('Enter at least 4 characters'); return; }
             localStorage.setItem('pp-sync-id', id);
             userIdRef.current = id;
+            setSyncToken(id);
             setShowSetup(false);
             setSyncStatus('syncing');
             const cloud = await window._cloudLoad(id);
@@ -358,12 +362,14 @@
         };
 
         const persist = useCallback(nd => {
+            lastLocalWriteRef.current = Date.now();
             setData(nd);
             localStorage.setItem('6mc-v2', JSON.stringify(nd));
             if (userIdRef.current) window._cloudSave(userIdRef.current, nd);
         }, []);
 
         const updateDay = useCallback((dateStr, updates) => {
+            lastLocalWriteRef.current = Date.now();
             setData(prev => {
                 const nd = { ...prev, dailyLogs: { ...prev.dailyLogs,
                     [dateStr]: { ...(prev.dailyLogs[dateStr]||emptyDay()), ...updates }
